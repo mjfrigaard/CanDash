@@ -1,0 +1,310 @@
+---
+title: "README - Wrangling Cannabis Data Sets"
+author: "Martin Frigaard"
+date: "current version: `r Sys.Date()`"
+output: github_document
+---
+
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+require(tidyverse)
+library(plotly)
+require(janitor)
+require(skimr)
+library(mosaic)
+library(inspectdf)
+library(visdat)
+library(DT)
+library(hrbrthemes)
+# base options ----
+base::options(
+  tibble.print_max = 25,
+  tibble.width = 78,
+  scipen = 100000000,
+  max.print = 999999
+)
+# knitr chunk options ----
+knitr::opts_chunk$set(
+  echo = TRUE, # show/hide all code
+  # results = "hide", # hide results
+  tidy = FALSE, # cleaner code printing
+  comment = "#> ", # better console printing
+  eval = TRUE, # turn this to FALSE stop code chunks from running
+  message = TRUE, # show messages
+  fig.width = 9, # figure width
+  fig.height = 6, # figure height
+  warning = FALSE, # show warnings
+  size = "small", # size of the text
+  fig.path = "figs/"
+) # location of files
+# knitr knit settings ----
+knitr::opts_knit$set(
+  width = 78
+)
+# set theme
+ggplot2::theme_set(theme_ipsum_tw(
+  base_family = "DroidSansMono",
+  base_size = 10,
+  strip_text_size = 9,
+  plot_title_family = "TitilliumWeb-SemiBold",
+  plot_title_size = 20,
+  axis_title_family = "Ubuntu",
+  axis_title_size = 13
+))
+```
+
+# Motivation
+
+This script outlines the steps to wrangle the Cannabis data from the [`kushyapp`](https://github.com/kushyapp/cannabis-dataset).
+
+## Import kushy data 
+
+```{r kushy_files, message=FALSE, warning=FALSE}
+# fs::dir_ls("data-model/kushy-datasets/csv")
+kushy_files <- fs::dir_ls("data-model/kushy-datasets/csv", regexp = "kushy_")
+writeLines(kushy_files)
+```
+
+Import these files.
+
+```{r import-kushy-data, message=FALSE, warning=FALSE}
+KushyBrands <- readr::read_csv(kushy_files[1])
+KushyProducts <- readr::read_csv(kushy_files[2])
+KushyShops <- readr::read_csv(kushy_files[3])
+KushyStrains <- readr::read_csv(kushy_files[4])
+```
+
+### Brands
+
+These are the categories in the `KushyBrands` data frame. 
+
+```{r cat-KushyBrands}
+kushy_brands_inspect_cat <- KushyBrands %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_cat()
+kushy_brands_inspect_cat %>%
+  inspectdf::show_plot()
+```
+
+#### Missing Kushy data 
+
+This plots show the missing data in the brands data.
+
+```{r kushy_brands_inspect_na}
+kushy_brands_inspect_na <- KushyBrands %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_na()
+kushy_brands_inspect_na %>%
+  inspectdf::show_plot(text_labels = TRUE)
+```
+
+> Added 1778 brands with fairly minimal columns (name, slug, location, category, Instagram username).
+
+```{r KushyBrands}
+KushyBrands %>% dplyr::glimpse(78)
+```
+
+#### Brands: `name`
+
+The `name` has `1776` unique observations (nearly one per row).
+
+```{r name}
+KushyBrands %>%
+  dplyr::distinct(name) %>%
+  base::nrow()
+```
+
+#### Brands: `slug`
+
+```{r name}
+KushyBrands %>%
+  dplyr::distinct(slug) %>%
+  base::nrow()
+```
+
+#### Brands: `location`
+
+These are messy--many duplicates that need some cleaning.
+
+```{r name}
+KushyBrands %>%
+  dplyr::count(location, sort = TRUE)
+```
+
+#### Brands: `category`
+
+The `category` variable seems like it lists all the possible combinations of items. I count it up below.
+
+```{r name}
+KushyBrands %>%
+  dplyr::count(category, sort = TRUE)
+```
+
+This variable will be useful for itemizing products later, so I can tidy each distinct category up so they can be visualized. 
+
+```{r KushyBrandsWide}
+KushyBrandsTidy <- KushyBrands %>%
+    # remove the comma from the category 
+  dplyr::mutate(cat_no_comma = stringr::str_remove_all(
+    string = category,
+    pattern = ",")) %>%
+    # split this into the separate columns
+  tidyr::separate(
+    col = cat_no_comma, into = c(
+      "category01",
+      "category02",
+      "category03",
+      "category04",
+      "category05",
+      "category06",
+      "category07"
+    ), remove = FALSE
+  ) %>% 
+    # now combine these columns into a single column with an index (key)
+  tidyr::pivot_longer(
+    cols = category01:category07,
+    names_to = "category_key",
+    values_to = "category_name",
+    values_drop_na = TRUE) 
+```
+
+Now we can check to see how these categories break down by quantity.
+
+```{r visualize-KushyBrandsTidy}
+KushyBrandsTidy %>% 
+  dplyr::count(category_name, sort = TRUE) %>% 
+  dplyr::mutate(category_name = reorder(category_name, n)) %>%
+  ggplot2::ggplot(aes(x = category_name, y = n)) +
+    ggplot2::geom_col(aes(fill = category_name), 
+                      show.legend = FALSE) +
+    ggplot2::labs(x = "Categories",
+                  y = "Count",
+                  title = "Kushy Brand Categories") +
+    ggplot2::coord_flip()
+```
+
+This tells me there are 20 different categories for brands, and that `Concentrates` are the most common brand category. I can also see `Flowers` and `Edibles` are number two and three. 
+
+### Products 
+
+```{r cat-KushyProducts}
+kushy_products_inspect_cat <- KushyProducts %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_cat()
+kushy_products_inspect_cat %>%
+  inspectdf::show_plot()
+```
+
+> Added 17233 products. Uses brand name, not brand slug (needs change). Contains some external links to lab results, to be scrubbed later for relational index to our own lab result DB.
+
+```{r KushyProducts}
+KushyProducts %>% dplyr::glimpse(78)
+```
+
+#### Products: `id`
+
+This looks like a unique `id` for each product in the data frame.
+
+```{r check-ids}
+identical(x = KushyProducts %>% dplyr::distinct(id) %>% base::nrow(),
+          y = KushyProducts %>% base::nrow())
+```
+
+
+#### Products: `name`
+
+These are the names for each product. 
+
+```{r name-of-product}
+KushyProducts %>% dplyr::count(name, sort = TRUE)
+```
+
+Not as useful--to granular.
+
+#### Products: `slug`
+
+This is the slug for each product, 
+
+```{r slug-of-product}
+KushyProducts %>% dplyr::count(slug, sort = TRUE)
+```
+
+These are unique (just like the `id`).
+
+#### Products: `brand`
+
+This contains all unique brands (similar to the `KushyBrands` data set)
+
+```{r brand-of-product}
+KushyProducts %>% 
+    dplyr::count(brand, sort = TRUE)
+```
+
+#### Products: `category`
+
+#### Products: `strain`
+
+#### Products: `thc`
+
+#### Products: `cbd`
+
+#### Products: `lab_test`
+
+### Shops
+
+```{r cat-KushyShops}
+kushy_shops_inspect_cat <- KushyShops %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_cat()
+kushy_shops_inspect_cat %>%
+  inspectdf::show_plot(text_labels = TRUE)
+```
+
+### Strains
+
+```{r cat-KushyShops}
+kushy_shops_inspect_cat <- KushyShops %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_cat()
+kushy_shops_inspect_cat %>%
+  inspectdf::show_plot(text_labels = TRUE)
+```
+
+### Categorical data 
+
+```{r cat-KushyStrains}
+kushy_strains_inspect_cat <- KushyStrains %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_cat()
+kushy_strains_inspect_cat %>%
+  inspectdf::show_plot(text_labels = TRUE)
+```
+
+## Missing data 
+
+```{r kushy_products_inspect_na}
+kushy_products_inspect_na <- KushyProducts %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_na()
+kushy_products_inspect_na %>%
+  inspectdf::show_plot(text_labels = TRUE)
+```
+
+
+```{r kushy_shops_inspect_na}
+kushy_shops_inspect_na <- KushyShops %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_na()
+kushy_shops_inspect_na %>%
+  inspectdf::show_plot(text_labels = TRUE)
+```
+
+```{r kushy_strains_inspect_na}
+kushy_strains_inspect_na <- KushyStrains %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_na()
+kushy_strains_inspect_na %>%
+  inspectdf::show_plot(text_labels = TRUE)
+```

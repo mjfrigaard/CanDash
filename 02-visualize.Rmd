@@ -1,0 +1,215 @@
+---
+title: "README - Visualize Cannabis Data"
+author: "Martin Frigaard"
+date: "current version: `r Sys.Date()`"
+output: github_document
+---
+
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+require(tidyverse)
+library(plotly)
+require(janitor)
+require(skimr)
+library(mosaic)
+library(inspectdf)
+library(visdat)
+library(DT)
+library(hrbrthemes)
+# base options ----
+base::options(
+  tibble.print_max = 25,
+  tibble.width = 78,
+  scipen = 100000000,
+  max.print = 999999
+)
+# knitr chunk options ----
+knitr::opts_chunk$set(
+  echo = TRUE, # show/hide all code
+  # results = "hide", # hide results
+  tidy = FALSE, # cleaner code printing
+  comment = "#> ", # better console printing
+  eval = TRUE, # turn this to FALSE stop code chunks from running
+  message = TRUE, # show messages
+  fig.width = 9, # figure width
+  fig.height = 6, # figure height
+  warning = FALSE, # show warnings
+  size = "small", # size of the text
+  fig.path = "figs/"
+) # location of files
+# knitr knit settings ----
+knitr::opts_knit$set(
+  width = 78
+)
+# set theme
+ggplot2::theme_set(theme_ipsum_tw(
+  base_family = "DroidSansMono",
+  base_size = 10,
+  strip_text_size = 9,
+  plot_title_family = "TitilliumWeb-SemiBold",
+  plot_title_size = 20,
+  axis_title_family = "Ubuntu",
+  axis_title_size = 13
+))
+```
+
+## Load the packages
+
+These are the packages we will use to visualize the cannabis data. 
+
+```{r package, message=FALSE, warning=FALSE}
+library(readr)
+library(tidyverse)
+library(lubridate)
+library(ggthemes)
+library(cluster)
+library(factoextra)
+library(textshape)
+```
+
+## The Online Retail data 
+
+This data came from a UK e-commerce dataset from the [UCI Machine Learning Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail). 
+
+```{r import-OnlineRetail, message=FALSE, warning=FALSE}
+# fs::dir_tree("data")
+OnlineRetail <- read_csv("data/raw/Online_Retail.csv") %>% 
+    janitor::clean_names(case = "snake")
+OnlineRetail %>% dplyr::glimpse(78)
+```
+
+
+
+```{r wow}
+Wow <- OnlineRetail %>% 
+    # get the week
+    dplyr::select(week_year, quantity) %>%
+    dplyr::group_by(week_year) %>%
+    dplyr::summarize(week_qty = sum(quantity)) %>%
+    dplyr::mutate(prev_week = lag(week_qty,1)) %>%
+    dplyr::mutate(wow_quantity = (week_qty - prev_week) / prev_week) %>%
+    dplyr::mutate(month = month(week_year, abbr = true, label = true)) %>%
+    dplyr::group_by(week_year)
+```
+
+
+
+
+
+
+ggWoW <- ggplot(data = wow, 
+                        mapping = aes(x=week_year, 
+                                      y = WoW_Quantity)) +
+                                      #color = purchaser_gender)) +
+    geom_line() +
+    geom_point() +
+    theme_fivethirtyeight() +
+    theme(axis.title = element_text()) +   
+    theme(legend.title = element_blank()) +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    facet_wrap(~ month, scales = "free") + 
+    ylab('Sales') +
+    xlab('Week') +    
+    ggtitle('Week Over Week Sales') 
+
+ggWoW 
+       
+
+ggQty <- wow %>%
+    na.omit() %>%
+    ggplot(data=., aes(x = week_year, y = Week_Qty)) + 
+    geom_line() +
+    geom_smooth() +
+    geom_point() +
+    #stat_summary(fun.y=mean, geom="bar") + 
+    #stat_summary(fun.data=mean_cl_boot, geom="errorbar", width=0.3) +
+    theme_fivethirtyeight() +
+    theme(axis.title = element_text()) + 
+    theme(legend.position = 'none') +
+    labs(title = "Quantity Per Week",
+         x = "Week", y = "Quantity Sold")
+
+
+ggQty  
+
+
+monthly <- ecom %>% 
+    select(floor_month, Country, Quantity, UnitPrice) %>%
+    mutate(Sales = Quantity*UnitPrice) %>%
+    group_by(floor_month,Country) %>%
+    summarize(MonthlySales = sum(Sales),
+              MedianSale = median(Sales)) %>%
+    group_by(floor_month, Country)
+
+ggmonthly <- monthly %>%
+    ggplot(data =., 
+                mapping = aes(x=floor_month, 
+                              y = MonthlySales)) +
+    geom_line() +
+    geom_point() +
+    theme_fivethirtyeight() +
+    theme(axis.title = element_text()) +   
+    theme(legend.title = element_blank()) +
+    scale_y_continuous(labels = scales::dollar_format(accuracy = 1)) +
+    facet_wrap(~ Country, scales = "free") + 
+    ylab('Sales') +
+    xlab('Month') +    
+    ggtitle('Monthly Sales') 
+
+ggmonthly 
+
+
+ggAOV <- monthly %>%
+    ggplot(data =., 
+           mapping = aes(x=floor_month, 
+                         y = MedianSale)) +
+    geom_line() +
+    geom_point() +
+    theme_fivethirtyeight() +
+    theme(axis.title = element_text()) +   
+    theme(legend.title = element_blank()) +
+    scale_y_continuous(labels = scales::dollar_format(accuracy = 1)) +
+    facet_wrap(~ Country, scales = "free") + 
+    ylab('Sales') +
+    xlab('Month') +    
+    ggtitle('Median Order Value') 
+
+ggAOV 
+
+customers_sales <- ecom %>%
+    select(CustomerID, Quantity, UnitPrice) %>%
+    group_by(CustomerID) %>%
+    mutate(Sales = (Quantity*UnitPrice)) %>%
+    summarize(Sales = sum(Sales),
+              MedianSale = median(Sales),
+              Quantity = sum(Quantity),
+              Median_Quantiy = median(Quantity)) %>%
+    group_by(CustomerID)
+
+customers_country <- ecom %>%
+    distinct(CustomerID, Country) %>%
+    group_by(CustomerID)
+
+customers_sales_country <- customers_sales %>%
+    inner_join(customers_country, by = "CustomerID")
+
+
+customer_sales_clust <- data.frame(customers_sales)
+customer_sales_clust <- customer_sales_clust %>%   
+                        drop_na() %>%
+                        filter(Sales > 0)
+summary(customer_sales_clust)
+customer_sales_clust <- column_to_rownames(customer_sales_clust) #, var = "CustomerID")
+
+customer_sales_clust <- scale(customer_sales_clust)
+k2 <- kmeans(customer_sales_clust, centers =2 , nstart = 25)
+k2
+
+fviz_cluster(k2, data = customer_sales_clust)
+
+customer_sales_clust <- data.frame(customer_sales_clust, k2$cluster)
+
+
+

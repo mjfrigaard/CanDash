@@ -1,0 +1,130 @@
+---
+title: "CanDash - A Cannabis Dashboard"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+# create figs folder ----
+if (!file.exists("figs/")) {
+    dir.create("figs/")
+}
+# create docs folder ----
+if (!file.exists("docs/")) {
+    dir.create("docs/")
+}
+library(knitr)
+library(rmdformats)
+library(tidyverse)
+library(devtools)
+library(hrbrthemes)
+library(vctrs)
+library(inspectdf)
+# chunks set options
+knitr::opts_chunk$set(
+  echo = TRUE, # show/hide all code
+  # results = "hide", # hide results
+  tidy = FALSE, # cleaner code printing
+  comment = "#> ", # better console printing
+  eval = TRUE, # turn this to FALSE stop code chunks from running
+  message = TRUE, # show messages
+  warning = FALSE, # show warnings
+  size = "small", # size of the text
+  fig.path = "figs/", # location of files
+  fig.height = 5.5, # height of figures
+  fig.width = 8 # width of figures
+) # width of figures
+# knit set options
+knitr::opts_knit$set(
+  width = 78,
+  progress = FALSE
+)
+# base options
+base::options(
+  tibble.print_max = 25,
+  tibble.width = 78,
+   max.print = 999999,
+  scipen = 100000000
+)
+# set the theme here for ggplot2
+ggplot2::theme_set(hrbrthemes::theme_ipsum_tw(
+  base_size = 10,
+  strip_text_size = 11,
+  axis_title_size = 13,
+  plot_title_size = 17,
+  subtitle_size = 13,
+  base_family = "Ubuntu",
+  strip_text_family = "TitilliumWeb-Regular",
+  axis_title_family = "TitilliumWeb-Regular",
+  subtitle_family = "TitilliumWeb-Regular",
+  plot_title_family = "JosefinSans-Regular"
+))
+```
+
+## Overview 
+
+File/folder structure
+
+```{r , echo=FALSE}
+fs::dir_tree(".", recurse = FALSE)
+```
+
+## The data model
+
+The data model for the CanDash application had to be constructed from a few different sources. First, a list of products, brands, and other categorical data were imported form the Kushy application on Github. You can find the original data for this project [here](https://github.com/kushyapp/cannabis-dataset). 
+
+```{r import-kushy-data, message=FALSE}
+# import the kushy data sets
+# fs::dir_ls("data-model/kushy-datasets/csv")
+# store .csv file paths in object
+kushy_csvs <- fs::dir_ls(path = "data-model/kushy-datasets/csv", 
+                         regexp = "\\.csv$")
+BrandProdShop <- kushy_csvs[1:3] %>% 
+    map_dfr(read_csv, .id = "source")
+# brands
+Brands <- BrandProdShop %>% 
+    dplyr::filter(stringr::str_detect(string = source, 
+                                      pattern = "brands-kushy_api"))
+# products
+Products <- BrandProdShop %>% 
+    dplyr::filter(stringr::str_detect(string = source, 
+                                      pattern = "products-kushy_api"))
+# shops
+Shops <- BrandProdShop %>% 
+    dplyr::filter(stringr::str_detect(string = source, 
+                                      pattern = "shops-kushy_api"))
+# the strains data set didnt import because the thc column is numeric, so we can import that below
+Strains <- readr::read_csv(kushy_csvs[4])
+```
+
+We had to simulate the cost data for the products in the `Products` and `Brands` tables. This was based on some basic information pulled out of nectar (an online marijuana ordering service)
+
+```{r data-objects}
+ls()
+```
+
+dutchie.com's service 
+
+> "*We’ve built the industry’s largest product library with professional photos, descriptions, and more. With thousands of products at your disposal, a beautiful menu—and more sales—are just one click away.*"
+
+These are the data we'd like to scrape, but ended up simulating instead. 
+
+### Products 
+
+These data are 
+
+```{r NAProducts}
+NAProducts <- inspectdf::inspect_na(df1 = Products)
+NAProducts %>% inspectdf::show_plot(text_labels = TRUE) 
+```
+
+
+```{r NABrands}
+NABrands <- inspectdf::inspect_na(df1 = Brands)
+NABrands %>% inspectdf::show_plot(text_labels = TRUE) 
+```
+
+
+
+
+
+

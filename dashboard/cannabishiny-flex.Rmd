@@ -1,0 +1,58 @@
+---
+title: "Cannabish-iny Dashboard"
+runtime: shiny
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+---
+
+
+```{r global, include=FALSE}
+# the other packages are loaded in the helper files 
+library(flexdashboard)
+library(shiny)
+# load and import functions and data
+# source()
+```
+
+
+Product Information {.sidebar}
+======================================================================
+
+```{r sidebar-selectInput}
+# brands -- 
+# this is a sample of 10 brands
+selectInput("canBrand",
+  label = h3("Cannabis brand"),
+  choices = list(brand = c("Madame Munchie", "Revivid CBD", "Apothecanna", 
+"Dixie Elixirs & Edibles", "Alpine Vapor", "Lunchbox Alchemy", 
+"Varavo", "Cheef Naturals", "Whoopi & Maya", "Chronic Solutions", 
+"Goodies by MaGooch", "Elevate Herbals", "WYLD", "Kandy Care", 
+"Waxman Concentrates", "Pretty Girl Extracts", "Cumulus Candies", 
+"Rising Sun Extract", "Siskiyou Sungrown", "Vader Extracts", 
+"Medi Brothers", "Evergreen Herbal", "FlavRX", "Trokie", "The CO2 Company", 
+"Royal Ambrosia", "Jayn Green", "Vegan Buddha", "The Nutty Baker", 
+"Pure Ratios", "DÃ©foncÃ©", "Shatter Tanks", "Green Ticket Bakery", 
+"First Class Concentrates", "California Finest", "Northern Emeralds")),
+  selected = "Madame Munchie"
+)
+# categories 
+# this is a sample of categories
+selectInput("canCat",
+  label = h3("Cannabis category"),
+  choices = list(category = c("Edibles,", "Tincture,", "Topical,", "Topical,Bath,", 
+"Edibles,Drink,", "Edibles,Chocolate,", "Edibles,Pill", "Edibles,Candy,", 
+"Edibles,Snack,", "Concentrate,Wax,", "Concentrate,Oil,", "Vapes,Vape Cartidge,", 
+"Concentrate,Topical,RSO", "Concentrate,Shatter,", "Concentrate,Crumble,Wax,", 
+"Flowers,Pre-Roll", "Concentrate,Bubble Hash,", "Vapes,Disposable Vape,", 
+"Edibles,Spread,")),
+  selected = "Edibles"
+)
+```
+
+
+
+
+
+
+
