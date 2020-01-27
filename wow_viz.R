@@ -14,13 +14,14 @@ library(factoextra)
 library(textshape)
 
 # fs::dir_ls("data/raw")
-ecom <- read_csv("data/raw/Online_Retail.csv")
-ecom$InvoiceDate_date <- as.Date(ecom$InvoiceDate, "%m/%d/%Y")
-ecom$dow <- day(ecom$InvoiceDate_date)
-ecom$week <- week(ecom$InvoiceDate_date)
-ecom$yr <- year(ecom$InvoiceDate_date)
-ecom$week_year <- floor_date(ecom$InvoiceDate_date, unit = "week")
-ecom$month <- month(ecom$week_year, abbr = TRUE, label = TRUE)
+ecom <- read_csv("data-model/online-retail/Online_Retail.csv")
+
+ecom$invoicedate_date <- as.date(ecom$invoicedate, "%m/%d/%y")
+ecom$dow <- day(ecom$invoicedate_date)
+ecom$week <- week(ecom$invoicedate_date)
+ecom$yr <- year(ecom$invoicedate_date)
+ecom$week_year <- floor_date(ecom$invoicedate_date, unit = "week")
+ecom$month <- month(ecom$week_year, abbr = true, label = true)
 ecom$floor_month <- floor_date(ecom$week_year, unit = "month")
 
 

@@ -1,5 +1,5 @@
 ---
-title: "README - Visualize Cannabis Data"
+title: "Part 2 - Visualize Cannabis Data"
 author: "Martin Frigaard"
 date: "current version: `r Sys.Date()`"
 output: github_document
@@ -33,25 +33,28 @@ knitr::opts_chunk$set(
   comment = "#> ", # better console printing
   eval = TRUE, # turn this to FALSE stop code chunks from running
   message = TRUE, # show messages
-  fig.width = 9, # figure width
-  fig.height = 6, # figure height
+  fig.width = 10, # figure width
+  fig.height = 7, # figure height
   warning = FALSE, # show warnings
   size = "small", # size of the text
-  fig.path = "figs/"
-) # location of files
+  fig.path = "figs/"  # location of files
+)
 # knitr knit settings ----
 knitr::opts_knit$set(
   width = 78
 )
 # set theme
-ggplot2::theme_set(theme_ipsum_tw(
-  base_family = "DroidSansMono",
-  base_size = 10,
-  strip_text_size = 9,
-  plot_title_family = "TitilliumWeb-SemiBold",
-  plot_title_size = 20,
-  axis_title_family = "Ubuntu",
-  axis_title_size = 13
+ggplot2::theme_set(hrbrthemes::theme_ipsum_tw(
+  base_size = 9,
+  strip_text_size = 10,
+  axis_title_size = 10,
+  plot_title_size = 17,
+  subtitle_size = 12,
+  base_family = "Ubuntu",
+  strip_text_family = "TitilliumWeb-Regular",
+  axis_title_family = "TitilliumWeb-Regular",
+  subtitle_family = "TitilliumWeb-Regular",
+  plot_title_family = "JosefinSans-Regular"
 ))
 ```
 
@@ -69,147 +72,307 @@ library(factoextra)
 library(textshape)
 ```
 
-## The Online Retail data 
+## Import Online Retail data 
 
 This data came from a UK e-commerce dataset from the [UCI Machine Learning Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail). 
 
 ```{r import-OnlineRetail, message=FALSE, warning=FALSE}
 # fs::dir_tree("data")
-OnlineRetail <- read_csv("data/raw/Online_Retail.csv") %>% 
+OnlineRetailRaw <- read_csv("data-model/online-retail/Online_Retail.csv") %>% 
     janitor::clean_names(case = "snake")
-OnlineRetail %>% dplyr::glimpse(78)
+OnlineRetailRaw %>% glimpse(78)
+```
+
+Below we wrangle the invoice date variable into a few additional variables we can use to get the week over week data.
+
+```{r wrangle}
+OnlineRetail <- OnlineRetailRaw %>% 
+    dplyr::mutate(
+                invoice_date = as.Date(invoice_date, "%m/%d/%y"),
+                dow = day(invoice_date),
+                week = week(invoice_date),
+                yr = year(invoice_date),
+                week_year = floor_date(invoice_date, unit = "week"),
+                month = month(week_year, abbr = TRUE, label = TRUE),
+                floor_month = floor_date(week_year, unit = "month"))
+OnlineRetail %>% glimpse(78)
+```
+
+This data set is a little too big, so we'll get a sample and call it `WeekOverWeek`.
+
+```{r WeekOverWeek}
+WeekOverWeek <- OnlineRetail %>%
+    # get the week_year by quantity
+  select(week_year, quantity) %>%
+    # group these data
+  group_by(week_year) %>%
+    # summarize the data by weekly quantity
+  summarize(week_qty = sum(quantity)) %>%
+    # This introduces the lag function, 
+    # Compute a lagged version of a time series, shifting the time base 
+    # back by a given number of observations.
+  mutate(prev_week = lag(week_qty, 1)) %>%
+    # now we get the ratio of the difference between the weekly quantity and 
+    # the previous week, and we divide that by the previous week.
+  mutate(wow_quantity = (week_qty - prev_week) / prev_week) %>%
+    # now we calculate the month, using week_year, abbreviations, and labels
+  mutate(month = month(week_year, abbr = TRUE, label = TRUE)) %>%
+    # and we group this final data set by the week_year variable
+  group_by(week_year)
+# check this data set
+WeekOverWeek %>% dplyr::glimpse(78)
+```
+
+## Plot annual sales
+
+These are the annual sales (line plots)
+
+```{r ggWoWAnnualSales}
+ggWoWAnnualSales <- WeekOverWeek %>% 
+    ggplot2::ggplot(aes(x = week_year, 
+                        y = wow_quantity)) +
+    ggplot2::geom_line() +
+    ggplot2::geom_point() +
+    ggplot2::theme(axis.title = element_text()) +   
+    ggplot2::theme(legend.title = element_blank()) +
+    ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    ggplot2::facet_wrap(~ month, scales = "free") + 
+    ggplot2::labs(y = 'Sales', 
+                  x = 'Week', 
+                  title = 'Week Over Week Annual Sales') 
+ggWoWAnnualSales 
+```
+
+This shows some missing data in December, and a lot of variance in the sales from month to month. Now we're wondering what the quantity sold per week is, and we can get this with `week_year` and `week_qty`.
+
+```{r ggWowQuantity}
+WeekOverWeek %>%
+    stats::na.omit() %>%
+    ggplot2::ggplot(data = ., 
+           aes(x = week_year, 
+               y = week_qty)) + 
+    ggplot2::geom_line() +
+    ggplot2::geom_smooth() +
+    ggplot2::geom_point() +
+    # stat_summary(fun.y = mean, 
+    #              geom = "bar") +
+    # stat_summary(fun.data = mean_cl_boot, 
+    #              geom = "errorbar", 
+    #              width = 0.3) +
+    ggplot2::theme(axis.title = element_text()) + 
+    ggplot2::theme(legend.position = 'none') +
+    ggplot2::labs(
+         x = "Week", 
+         y = "Quantity Sold",
+         title = "Quantity Per Week") -> ggWowQuantity
+ggWowQuantity
+```
+
+```{r}
+OnlineRetailRaw %>% glimpse(78)
+```
+
+## Create Monthly Sales data 
+
+Next we create the monthly sales data frame, with the `unit_price`, `quantity`, `country`, and `floor_month`
+
+```{r MonthlySales}
+MonthlySales <- OnlineRetail %>% 
+    # get the floor_month. country, quantity, and unit_price
+    dplyr::select(floor_month, 
+                  country, 
+                  quantity, 
+                  unit_price) %>%
+    # we can create the "sales"
+    dplyr::mutate(sales = quantity*unit_price) %>%
+    # now we group by the floor_month and country
+    dplyr::group_by(floor_month, country) %>%
+    # and summarize this by the monthly_sales adn median sales
+    dplyr::summarize(monthly_sales = sum(sales), 
+                     median_sales = median(sales)) %>%
+    # and group it by the floor_month and country
+    group_by(floor_month, country)
+# check new data 
+MonthlySales %>% dplyr::glimpse(78)
+```
+
+```{r}
+MonthlySales %>% nrow()
 ```
 
 
+```{r ggTop100MonthlyCountrySales}
+ggTop100MonthlyCountrySales <- MonthlySales %>%
+    # sort these by monthly_sales
+    dplyr::arrange(desc(monthly_sales)) %>% 
+    # get the top 100 sales
+    utils::head(100) %>% 
+    # plot this as floor_month vs. monthly sales
+    ggplot2::ggplot(data = ., 
+                    aes(x = floor_month, 
+                        y = monthly_sales)) +
+    # add a line
+    ggplot2::geom_line() +
+    # and a point
+    ggplot2::geom_point() +
+    # and a theme
+    ggplot2::theme(axis.title = element_text()) +   
+    # with legend title
+    ggplot2::theme(legend.title = element_blank()) +
+    # and the scales for dollar formats
+    ggplot2::scale_y_continuous(labels = scales::dollar_format(accuracy = 1)) +
+    ggplot2::facet_wrap(. ~ country, 
+                        scales = "free") + 
+    ggplot2::labs(y = 'Sales',
+                  x = 'Month',
+                  title = 'Monthly Sales') 
 
-```{r wow}
-Wow <- OnlineRetail %>% 
-    # get the week
-    dplyr::select(week_year, quantity) %>%
-    dplyr::group_by(week_year) %>%
-    dplyr::summarize(week_qty = sum(quantity)) %>%
-    dplyr::mutate(prev_week = lag(week_qty,1)) %>%
-    dplyr::mutate(wow_quantity = (week_qty - prev_week) / prev_week) %>%
-    dplyr::mutate(month = month(week_year, abbr = true, label = true)) %>%
-    dplyr::group_by(week_year)
+ggTop100MonthlyCountrySales 
 ```
-
-
-
-
-
-
-ggWoW <- ggplot(data = wow, 
-                        mapping = aes(x=week_year, 
-                                      y = WoW_Quantity)) +
-                                      #color = purchaser_gender)) +
-    geom_line() +
-    geom_point() +
-    theme_fivethirtyeight() +
-    theme(axis.title = element_text()) +   
-    theme(legend.title = element_blank()) +
-    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-    facet_wrap(~ month, scales = "free") + 
-    ylab('Sales') +
-    xlab('Week') +    
-    ggtitle('Week Over Week Sales') 
-
-ggWoW 
        
 
-ggQty <- wow %>%
-    na.omit() %>%
-    ggplot(data=., aes(x = week_year, y = Week_Qty)) + 
-    geom_line() +
-    geom_smooth() +
-    geom_point() +
-    #stat_summary(fun.y=mean, geom="bar") + 
-    #stat_summary(fun.data=mean_cl_boot, geom="errorbar", width=0.3) +
-    theme_fivethirtyeight() +
-    theme(axis.title = element_text()) + 
-    theme(legend.position = 'none') +
-    labs(title = "Quantity Per Week",
-         x = "Week", y = "Quantity Sold")
+## Median Order Value 
+
+This is the median sales by `floor_month`, sorted by the `median_sales`. 
+
+```{r ggMedianOrderValue, message=FALSE, warning=FALSE}
+MonthlySales %>%
+    # sort these by median_sales
+    dplyr::arrange(desc(median_sales)) %>% 
+    # get the top 100 sales
+    utils::head(50) %>% 
+    ggplot2::ggplot(data = ., 
+           mapping = aes(x = floor_month, 
+                         y = median_sales)) +
+    ggplot2::geom_line() +
+    # 
+    ggplot2::geom_point() +
+    # 
+    ggplot2::scale_y_continuous(labels = scales::dollar_format(accuracy = 1)) +
+    ggplot2::facet_wrap(~ country, 
+               scales = "free") + 
+    ggplot2::labs(y = 'Sales', 
+                  x = 'Month',
+                  title = 'Median Order Value') -> ggMedianOrderValue
+ggMedianOrderValue
+```
+
+## Create Customer Sales data
+
+These data are the sales by customer id. We create this data frame by grouping on `customer_id`, then create a `sales` variable by multiplying the quantity by the unit price (`quantity * unit_price`).
+
+We also create three variables that aggregate the sales (`sum` and `median`).
+
+```{r CustomerSales}
+CustomerSales <- OnlineRetail %>%
+    # select the customer_id, quantity, and unit_price
+    dplyr::select(customer_id, quantity, unit_price) %>%
+    # group it by the customer id
+    dplyr::group_by(customer_id) %>%
+    # create sales (which is the product of quantity and price)
+    dplyr::mutate(sales = (quantity * unit_price)) %>%
+    # summarize
+    dplyr::summarize(
+            sales_sum = sum(sales),
+            sales_median = median(sales),
+            quantity_sum = sum(quantity),
+            quantiy_median = median(quantity)) %>%
+    # we group this again by customer id
+    dplyr::group_by(customer_id)
+CustomerSales %>% dplyr::glimpse(78)
+```
+
+## Customer country data
+
+We now join the `CustomerSales` data to a data frame with the distinct customer ids and countries (`CustomersCountry`).
+
+```{r join-CustomersCountry}
+CustomersCountry <- OnlineRetail %>%
+    dplyr::distinct(customer_id, country) %>%
+    dplyr::group_by(customer_id)
+# join this to the CustomerSales
+CustomersSalesCountry <- CustomerSales %>%
+    dplyr::inner_join(CustomersCountry, 
+               by = "customer_id")
+# check
+CustomersSalesCountry %>% dplyr::glimpse(78)
+```
+
+### Create cluster (modeling) data frame
+
+Ok, now we are going to convert the grouped data frame, drop the missing rows, and remove any data where sales were less than zero.
+
+```{r CustomerSalesClust}
+# convert to data frame
+CustomerSalesClust <- base::data.frame(CustomerSales)
+
+CustomerSalesClust <- CustomerSalesClust %>%  
+    # drop na 
+                        tidyr::drop_na() %>%
+    # remove sales less than 0
+                        dplyr::filter(sales_sum > 0)
+skimr::skim(CustomerSalesClust)
+```
+
+## k-means clustering
+
+Finally, we run a k-means clustering algorithm on the clustered sales data. *What does a k-means clustering do?* Well, here is a great definition on [Medium](https://towardsdatascience.com/understanding-k-means-clustering-in-machine-learning-6a6e67336aa1), 
+
+> the objective of K-means is simple: group similar data points together and discover underlying patterns. To achieve this objective, K-means looks for a fixed number (k) of clusters in a dataset.
+
+The k-means algorithm is an **unsupervised machine learning algorithm.** The steps to perform this are: 
+
+1. Use the `textshape::column_to_rownames()` function on the clustered data frame. This function 
+
+> "*Takes an existing column and uses it as rownames instead. This is useful when turning a data.frame into a matrix. Inspired by the tibble package's `column_to_row` which is now deprecated if done on a `tibble` object. By coercing to a `data.frame` this problem is avoided.*"
+
+We're going to use the non-descript name, `CustomerSalesClust2`. to show what this function is actually doing. The `utils::str()` function gives us some information on what kind of object we've created here.
+
+```{r column_to_rownames}
+CustomerSalesClust2 <- textshape::column_to_rownames(CustomerSalesClust) 
+utils::str(CustomerSalesClust)
+utils::str(CustomerSalesClust2)
+```
+
+The `CustomerSalesClust2` took the existing data frame (`CustomerSalesClust`) and removed a column (`customer_id`) and assigned them a rowname `base::rownames()`.
+
+```{r rownames}
+base::rownames(CustomerSalesClust2) %>% head()
+```
 
 
-ggQty  
+2. The 2nd step is to Scale the new `CustomerSalesClust` with `base::scale()`, which now has been transformed via the `textshape::column_to_rownames()` function. The `scale()` function who's, "*default method centers and/or scales the columns of a numeric matrix.*"
 
+```{r scale}
+CustomerSalesClust3 <- base::scale(CustomerSalesClust2)
+str(CustomerSalesClust3)
+```
 
-monthly <- ecom %>% 
-    select(floor_month, Country, Quantity, UnitPrice) %>%
-    mutate(Sales = Quantity*UnitPrice) %>%
-    group_by(floor_month,Country) %>%
-    summarize(MonthlySales = sum(Sales),
-              MedianSale = median(Sales)) %>%
-    group_by(floor_month, Country)
+Use the `kmeans()` function with the specifications below:
 
-ggmonthly <- monthly %>%
-    ggplot(data =., 
-                mapping = aes(x=floor_month, 
-                              y = MonthlySales)) +
-    geom_line() +
-    geom_point() +
-    theme_fivethirtyeight() +
-    theme(axis.title = element_text()) +   
-    theme(legend.title = element_blank()) +
-    scale_y_continuous(labels = scales::dollar_format(accuracy = 1)) +
-    facet_wrap(~ Country, scales = "free") + 
-    ylab('Sales') +
-    xlab('Month') +    
-    ggtitle('Monthly Sales') 
+`centers` = A matrix of cluster centres.
+`nstart` = 
 
-ggmonthly 
-
-
-ggAOV <- monthly %>%
-    ggplot(data =., 
-           mapping = aes(x=floor_month, 
-                         y = MedianSale)) +
-    geom_line() +
-    geom_point() +
-    theme_fivethirtyeight() +
-    theme(axis.title = element_text()) +   
-    theme(legend.title = element_blank()) +
-    scale_y_continuous(labels = scales::dollar_format(accuracy = 1)) +
-    facet_wrap(~ Country, scales = "free") + 
-    ylab('Sales') +
-    xlab('Month') +    
-    ggtitle('Median Order Value') 
-
-ggAOV 
-
-customers_sales <- ecom %>%
-    select(CustomerID, Quantity, UnitPrice) %>%
-    group_by(CustomerID) %>%
-    mutate(Sales = (Quantity*UnitPrice)) %>%
-    summarize(Sales = sum(Sales),
-              MedianSale = median(Sales),
-              Quantity = sum(Quantity),
-              Median_Quantiy = median(Quantity)) %>%
-    group_by(CustomerID)
-
-customers_country <- ecom %>%
-    distinct(CustomerID, Country) %>%
-    group_by(CustomerID)
-
-customers_sales_country <- customers_sales %>%
-    inner_join(customers_country, by = "CustomerID")
-
-
-customer_sales_clust <- data.frame(customers_sales)
-customer_sales_clust <- customer_sales_clust %>%   
-                        drop_na() %>%
-                        filter(Sales > 0)
-summary(customer_sales_clust)
-customer_sales_clust <- column_to_rownames(customer_sales_clust) #, var = "CustomerID")
-
-customer_sales_clust <- scale(customer_sales_clust)
-k2 <- kmeans(customer_sales_clust, centers =2 , nstart = 25)
+```{r k2}
+k2 <- kmeans(CustomerSalesClust, 
+             # the number of cluster centries
+             centers = 2 , 
+             ## random starts do help here with too many clusters
+             ## (and are often recommended anyway!):
+             nstart = 25)
 k2
+```
 
-fviz_cluster(k2, data = customer_sales_clust)
 
-customer_sales_clust <- data.frame(customer_sales_clust, k2$cluster)
+```{r five-cluster}
+fviz_cluster(k2, data = CustomerSalesClust3)
+```
+
+```{r CustomerSalesCluser}
+CustomerSalesCluser <- base::data.frame(CustomerSalesClust, k2$cluster)
+CustomerSalesCluser %>% dplyr::glimpse(78)
+```
+
 
 
 
