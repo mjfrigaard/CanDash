@@ -1,0 +1,76 @@
+
+
+#### Missing Kushy brand data 
+
+This plots show the missing data in the brands data.
+
+```{r kushy_brands_inspect_na}
+kushy_brands_inspect_na <- KushyBrands %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_na()
+kushy_brands_inspect_na %>%
+  inspectdf::show_plot(text_labels = TRUE)
+```
+
+```{r cat-KushyBrands}
+kushy_brands_inspect_cat <- KushyBrands %>%
+  dplyr::select_if(is.character) %>%
+  inspectdf::inspect_cat()
+kushy_brands_inspect_cat %>% 
+  inspectdf::show_plot()
+```
+
+```{r cat-KushyShops}
+kushy_shops_inspect_cat <- KushyShops %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_cat()
+kushy_shops_inspect_cat %>%
+  inspectdf::show_plot(text_labels = TRUE)
+```
+
+### Strains
+
+```{r cat-KushyShops}
+kushy_shops_inspect_cat <- KushyShops %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_cat()
+kushy_shops_inspect_cat %>%
+  inspectdf::show_plot(text_labels = TRUE)
+```
+
+### Categorical data 
+
+```{r cat-KushyStrains}
+kushy_strains_inspect_cat <- KushyStrains %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_cat()
+kushy_strains_inspect_cat %>%
+  inspectdf::show_plot(text_labels = TRUE)
+```
+
+## Missing data 
+
+```{r kushy_products_inspect_na}
+kushy_products_inspect_na <- KushyProducts %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_na()
+kushy_products_inspect_na %>%
+  inspectdf::show_plot(text_labels = TRUE)
+```
+
+
+```{r kushy_shops_inspect_na}
+kushy_shops_inspect_na <- KushyShops %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_na()
+kushy_shops_inspect_na %>%
+  inspectdf::show_plot(text_labels = TRUE)
+```
+
+```{r kushy_strains_inspect_na}
+kushy_strains_inspect_na <- KushyStrains %>%
+  select_if(is.character) %>%
+  inspectdf::inspect_na()
+kushy_strains_inspect_na %>%
+  inspectdf::show_plot(text_labels = TRUE)
+```

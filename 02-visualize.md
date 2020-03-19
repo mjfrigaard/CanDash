@@ -1,7 +1,7 @@
 Part 2 - Visualize Cannabis Data
 ================
 Martin Frigaard
-current version: 2020-01-27
+current version: 2020-03-19
 
 ## Load the packages
 
@@ -15,70 +15,135 @@ library(ggthemes)
 library(cluster)
 library(factoextra)
 library(textshape)
+library(knitr)
+library(rmdformats)
+library(plotly)
+require(janitor)
+require(skimr)
+library(mosaic)
+library(inspectdf)
+library(visdat)
+library(DT)
+library(hrbrthemes)
 ```
 
-## Import Online Retail data
+## Import data
 
 This data came from a UK e-commerce dataset from the [UCI Machine
 Learning
-Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail).
+Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail) and
+the [kushy cannabis data
+set](https://github.com/kushyapp/cannabis-dataset).
 
 ``` r
-# fs::dir_tree("data")
-OnlineRetailRaw <- read_csv("data-model/online-retail/Online_Retail.csv") %>% 
-    janitor::clean_names(case = "snake")
-OnlineRetailRaw %>% glimpse(78)
+# fs::dir_tree("data/processed/")
+CannabisWowData <- read_csv("data/processed/2020-03-17-CannabisWowData.csv")
 ```
 
-    #>  Observations: 541,909
-    #>  Variables: 8
-    #>  $ invoice_no   <chr> "536365", "536365", "536365", "536365", "536365", "536…
-    #>  $ stock_code   <chr> "85123A", "71053", "84406B", "84029G", "84029E", "2275…
-    #>  $ description  <chr> "WHITE HANGING HEART T-LIGHT HOLDER", "WHITE METAL LAN…
-    #>  $ quantity     <dbl> 6, 6, 8, 6, 6, 2, 6, 6, 6, 32, 6, 6, 8, 6, 6, 3, 2, 3,…
-    #>  $ invoice_date <chr> "12/1/2010 8:26", "12/1/2010 8:26", "12/1/2010 8:26", …
-    #>  $ unit_price   <dbl> 2.55, 3.39, 2.75, 3.39, 3.39, 7.65, 4.25, 1.85, 1.85, …
-    #>  $ customer_id  <dbl> 17850, 17850, 17850, 17850, 17850, 17850, 17850, 17850…
-    #>  $ country      <chr> "United Kingdom", "United Kingdom", "United Kingdom", …
-
-Below we wrangle the invoice date variable into a few additional
-variables we can use to get the week over week data.
-
 ``` r
-OnlineRetail <- OnlineRetailRaw %>% 
-    dplyr::mutate(
-                invoice_date = as.Date(invoice_date, "%m/%d/%y"),
-                dow = day(invoice_date),
-                week = week(invoice_date),
-                yr = year(invoice_date),
-                week_year = floor_date(invoice_date, unit = "week"),
-                month = month(week_year, abbr = TRUE, label = TRUE),
-                floor_month = floor_date(week_year, unit = "month"))
-OnlineRetail %>% glimpse(78)
+CannabisWowData %>% utils::str() 
 ```
 
-    #>  Observations: 541,909
-    #>  Variables: 14
-    #>  $ invoice_no   <chr> "536365", "536365", "536365", "536365", "536365", "536…
-    #>  $ stock_code   <chr> "85123A", "71053", "84406B", "84029G", "84029E", "2275…
-    #>  $ description  <chr> "WHITE HANGING HEART T-LIGHT HOLDER", "WHITE METAL LAN…
-    #>  $ quantity     <dbl> 6, 6, 8, 6, 6, 2, 6, 6, 6, 32, 6, 6, 8, 6, 6, 3, 2, 3,…
-    #>  $ invoice_date <date> 2020-12-01, 2020-12-01, 2020-12-01, 2020-12-01, 2020-…
-    #>  $ unit_price   <dbl> 2.55, 3.39, 2.75, 3.39, 3.39, 7.65, 4.25, 1.85, 1.85, …
-    #>  $ customer_id  <dbl> 17850, 17850, 17850, 17850, 17850, 17850, 17850, 17850…
-    #>  $ country      <chr> "United Kingdom", "United Kingdom", "United Kingdom", …
-    #>  $ dow          <int> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, …
-    #>  $ week         <dbl> 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48…
-    #>  $ yr           <dbl> 2020, 2020, 2020, 2020, 2020, 2020, 2020, 2020, 2020, …
-    #>  $ week_year    <date> 2020-11-29, 2020-11-29, 2020-11-29, 2020-11-29, 2020-…
-    #>  $ month        <ord> Nov, Nov, Nov, Nov, Nov, Nov, Nov, Nov, Nov, Nov, Nov,…
-    #>  $ floor_month  <date> 2020-11-01, 2020-11-01, 2020-11-01, 2020-11-01, 2020-…
+    #>  Classes 'spec_tbl_df', 'tbl_df', 'tbl' and 'data.frame':    2799 obs. of  21 variables:
+    #>  $ id : num 404 404 404 404 404 404 216 216 ...
+    #>  $ location : chr "California" "California" "California" ...
+    #>  $ quantity : num 1296 600 600 480 ...
+    #>  $ unit_price : num 1.06 0.42 1.79 0.36 0.42 2.55 0.39 1.74 ...
+    #>  $ cost_per_invoice: num 1374 252 1074 173 ...
+    #>  $ product_name : chr "Sour Diesel" "Sour Diesel" "Sour Diesel" ...
+    #>  $ prod_name_count : num 480 480 480 480 480 480 423 423 ...
+    #>  $ product_category: chr "Flowers" "Flowers" "Flowers" ...
+    #>  $ invoice_date : Date, format: "2020-10-07" "2020-07-24" ...
+    #>  $ dow : num 7 24 6 18 18 6 28 11 ...
+    #>  $ week : num 41 30 40 16 12 49 44 41 ...
+    #>  $ yr : num 2020 2020 2020 2020 2020 2020 2020 2020 ...
+    #>  $ week_year : Date, format: "2020-10-04" "2020-07-19" ...
+    #>  $ month : chr "Oct" "Jul" "Oct" ...
+    #>  $ floor_month : Date, format: "2020-10-01" "2020-07-01" ...
+    #>  $ invoice_no : num 570097 561051 569815 550344 ...
+    #>  $ stock_code : chr "20971" "21977" "85099F" ...
+    #>  $ product_details : chr "Pre-roll" "Pre-roll" "Pre-roll" ...
+    #>  $ brand : chr "Medi Cone" "Medi Cone" "Medi Cone" ...
+    #>  $ brand_name : chr "Day Dreamers" "Day Dreamers" "Day Dreamers" ...
+    #>  $ brand_category : chr "Concentrates" "Edibles" "Medical" ...
+    #>  - attr(*, "problems")=Classes 'tbl_df', 'tbl' and 'data.frame': 35 obs. of 5
+    #>     variables:
+    #>  ..$ row : int 2757 2758 2759 2760 2761 2762 2763 2764 ...
+    #>  ..$ col : chr "invoice_no" "invoice_no" "invoice_no" ...
+    #>  ..$ expected: chr "a double" "a double" "a double" ...
+    #>  ..$ actual : chr "C548695" "C575651" "C541090" ...
+    #>  ..$ file : chr "'data/processed/2020-03-17-CannabisWowData.csv'"
+    #>     "'data/processed/2020-03-17-CannabisWowData.csv'"
+    #>     "'data/processed/2020-03-17-CannabisWowData.csv'" ...
+    #>  - attr(*, "spec")=
+    #>  .. cols(
+    #>  ..  id = col_double(),
+    #>  ..  location = col_character(),
+    #>  ..  quantity = col_double(),
+    #>  ..  unit_price = col_double(),
+    #>  ..  cost_per_invoice = col_double(),
+    #>  ..  product_name = col_character(),
+    #>  ..  prod_name_count = col_double(),
+    #>  ..  product_category = col_character(),
+    #>  ..  invoice_date = col_date(format = ""),
+    #>  ..  dow = col_double(),
+    #>  ..  week = col_double(),
+    #>  ..  yr = col_double(),
+    #>  ..  week_year = col_date(format = ""),
+    #>  ..  month = col_character(),
+    #>  ..  floor_month = col_date(format = ""),
+    #>  ..  invoice_no = col_double(),
+    #>  ..  stock_code = col_character(),
+    #>  ..  product_details = col_character(),
+    #>  ..  brand = col_character(),
+    #>  ..  brand_name = col_character(),
+    #>  ..  brand_category = col_character()
+    #>  .. )
 
-This data set is a little too big, so we’ll get a sample and call it
-`WeekOverWeek`.
+This `data.frame` is a combination of some sales data with some product
+and brand data.
 
 ``` r
-WeekOverWeek <- OnlineRetail %>%
+CannabisWowData %>% 
+  dplyr::count(brand_category, sort = TRUE) %>% 
+  dplyr::mutate(brand_category = reorder(brand_category, n)) %>%
+  ggplot2::ggplot(aes(x = brand_category, y = n)) +
+    ggplot2::geom_col(aes(fill = brand_category), 
+                      show.legend = FALSE) +
+    ggplot2::labs(x = "Brand Category",
+                  y = "Count",
+                  title = "Most Common Cannabis Brand Categories") +
+    ggplot2::coord_flip()
+```
+
+![](figs/visualize-brand_category-1.png)<!-- -->
+
+This tells me there are 17 different categories for brands, and
+`Concentrates` are the most common brand category. I can also see
+`Flower` and `Edibles` are numbers two and three.
+
+``` r
+CannabisWowData %>% 
+  dplyr::count(product_category, sort = TRUE) %>% 
+  dplyr::mutate(product_category = reorder(product_category, n)) %>%
+  ggplot2::ggplot(aes(x = product_category, y = n)) +
+    ggplot2::geom_col(aes(fill = product_category), 
+                      show.legend = FALSE) +
+    ggplot2::labs(x = "Product Category",
+                  y = "Count",
+                  title = "Most Common Cannabis Product Categories") +
+    ggplot2::coord_flip()
+```
+
+![](figs/visualize-product_category-1.png)<!-- -->
+
+## Creating week over week data
+
+The code below creates a data.frame that is ‘week-over-week’, which is
+not an uncommon way of reporting sales data.
+
+``` r
+WeekOverWeek <- CannabisWowData %>%
     # get the week_year by quantity
   select(week_year, quantity) %>%
     # group these data
@@ -97,188 +162,325 @@ WeekOverWeek <- OnlineRetail %>%
     # and we group this final data set by the week_year variable
   group_by(week_year)
 # check this data set
-WeekOverWeek %>% dplyr::glimpse(78)
+WeekOverWeek %>% utils::str()
 ```
 
-    #>  Observations: 52
-    #>  Variables: 5
-    #>  Groups: week_year [52]
-    #>  $ week_year    <date> 2019-12-29, 2020-01-05, 2020-01-12, 2020-01-19, 2020-…
-    #>  $ week_qty     <dbl> 7939, 103659, 69528, 72663, 70517, 58585, 67143, 86949…
-    #>  $ prev_week    <dbl> NA, 7939, 103659, 69528, 72663, 70517, 58585, 67143, 8…
-    #>  $ wow_quantity <dbl> NA, 12.056934123, -0.329262293, 0.045089748, -0.029533…
-    #>  $ month        <ord> Dec, Jan, Jan, Jan, Jan, Feb, Feb, Feb, Feb, Mar, Mar,…
+    #>  Classes 'grouped_df', 'tbl_df', 'tbl' and 'data.frame': 52 obs. of  5 variables:
+    #>  $ week_year : Date, format: "2019-12-29" "2020-01-05" ...
+    #>  $ week_qty : num 47 432 366 400 260 320 402 318 ...
+    #>  $ prev_week : num NA 47 432 366 400 260 320 402 ...
+    #>  $ wow_quantity: num NA 8.1915 -0.1528 0.0929 ...
+    #>  $ month : Ord.factor w/ 12 levels "Jan"<"Feb"<"Mar"<..: 12 1 1 1 1 2 2 2 ...
+    #>  - attr(*, "groups")=Classes 'tbl_df', 'tbl' and 'data.frame': 52 obs. of 2
+    #>     variables:
+    #>  ..$ week_year: Date, format: "2019-12-29" "2020-01-05" ...
+    #>  ..$ .rows :List of 52
+    #>  .. ..$ : int 1
+    #>  .. ..$ : int 2
+    #>  .. ..$ : int 3
+    #>  .. ..$ : int 4
+    #>  .. ..$ : int 5
+    #>  .. ..$ : int 6
+    #>  .. ..$ : int 7
+    #>  .. ..$ : int 8
+    #>  .. ..$ : int 9
+    #>  .. ..$ : int 10
+    #>  .. ..$ : int 11
+    #>  .. ..$ : int 12
+    #>  .. ..$ : int 13
+    #>  .. ..$ : int 14
+    #>  .. ..$ : int 15
+    #>  .. ..$ : int 16
+    #>  .. ..$ : int 17
+    #>  .. ..$ : int 18
+    #>  .. ..$ : int 19
+    #>  .. ..$ : int 20
+    #>  .. ..$ : int 21
+    #>  .. ..$ : int 22
+    #>  .. ..$ : int 23
+    #>  .. ..$ : int 24
+    #>  .. ..$ : int 25
+    #>  .. ..$ : int 26
+    #>  .. ..$ : int 27
+    #>  .. ..$ : int 28
+    #>  .. ..$ : int 29
+    #>  .. ..$ : int 30
+    #>  .. ..$ : int 31
+    #>  .. ..$ : int 32
+    #>  .. ..$ : int 33
+    #>  .. ..$ : int 34
+    #>  .. ..$ : int 35
+    #>  .. ..$ : int 36
+    #>  .. ..$ : int 37
+    #>  .. ..$ : int 38
+    #>  .. ..$ : int 39
+    #>  .. ..$ : int 40
+    #>  .. ..$ : int 41
+    #>  .. ..$ : int 42
+    #>  .. ..$ : int 43
+    #>  .. ..$ : int 44
+    #>  .. ..$ : int 45
+    #>  .. ..$ : int 46
+    #>  .. ..$ : int 47
+    #>  .. ..$ : int 48
+    #>  .. ..$ : int 49
+    #>  .. ..$ : int 50
+    #>  .. ..$ : int 51
+    #>  .. ..$ : int 52
+    #>  ..- attr(*, ".drop")= logi TRUE
 
-## Plot annual sales
+Here we see there is a data.frame with 52 rows (one for each week).
 
-These are the annual sales (line plots)
+## Plot annual sales (by week)
+
+These are the annual sales (line plots) by week, faceted by month.
 
 ``` r
+# set theme
+ggplot2::theme_set(hrbrthemes::theme_ipsum_rc(
+  base_size = 9,
+  strip_text_size = 10,
+  axis_title_size = 9,
+  plot_title_size = 13,
+  subtitle_size = 11
+))
+```
+
+``` r
+  # these are the labels
+labs_wow_annual_sales <- ggplot2::labs(
+  y = 'Sales', 
+  x = 'Week', 
+  title = 'Week Over Week Annual Sales',
+  subtitle = "Simulated Cannabis Sales Data",
+  caption = "graphic and analysis by PDG") 
+
 ggWoWAnnualSales <- WeekOverWeek %>% 
+  # this will put week_year on the x
     ggplot2::ggplot(aes(x = week_year, 
+                        # and the week over week quantity on the y
                         y = wow_quantity)) +
+  # add the line plot
     ggplot2::geom_line() +
+  # and the point
     ggplot2::geom_point() +
-    ggplot2::theme(axis.title = element_text()) +   
+  # the axis title here will inherit the size and color
+    ggplot2::theme(axis.title = element_text(face = c("bold"))) +
+  # this will remove the legend
     ggplot2::theme(legend.title = element_blank()) +
-    ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-    ggplot2::facet_wrap(~ month, scales = "free") + 
-    ggplot2::labs(y = 'Sales', 
-                  x = 'Week', 
-                  title = 'Week Over Week Annual Sales') 
+  # this adds the percent on the y axis
+    ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1),) +
+  # here we facet by the month
+    ggplot2::facet_wrap(. ~ month, 
+                        # 
+                        scales = "free") + 
+    ggplot2::theme(axis.text.x = 
+                     element_text(angle = 45, 
+                                  hjust = 0.5, 
+                                  vjust = 0.5)) +
+  labs_wow_annual_sales
 ggWoWAnnualSales 
 ```
 
 ![](figs/ggWoWAnnualSales-1.png)<!-- -->
 
 This shows some missing data in December, and a lot of variance in the
-sales from month to month. Now we’re wondering what the quantity sold
-per week is, and we can get this with `week_year` and `week_qty`.
+sales from month to month. We can check the missing data for December
+using the graph below
 
 ``` r
-WeekOverWeek %>%
-    stats::na.omit() %>%
-    ggplot2::ggplot(data = ., 
-           aes(x = week_year, 
-               y = week_qty)) + 
+WeekOverWeek %>% 
+  dplyr::filter(month == "Dec") %>% 
+  # this will put week_year on the x
+    ggplot2::ggplot(aes(x = week_year, 
+                        # and the week over week quantity on the y
+                        y = wow_quantity)) +
+  # add the line plot
     ggplot2::geom_line() +
-    ggplot2::geom_smooth() +
+  # and the point
     ggplot2::geom_point() +
-    # stat_summary(fun.y = mean, 
-    #              geom = "bar") +
-    # stat_summary(fun.data = mean_cl_boot, 
-    #              geom = "errorbar", 
-    #              width = 0.3) +
-    ggplot2::theme(axis.title = element_text()) + 
-    ggplot2::theme(legend.position = 'none') +
-    ggplot2::labs(
+  # the axis title here will inherit the size and color
+    ggplot2::theme(axis.title = element_text(face = c("bold"))) +
+  # this will remove the legend
+    ggplot2::theme(legend.title = element_blank()) +
+  # this adds the percent on the y axis
+    ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1))
+```
+
+![](figs/unnamed-chunk-1-1.png)<!-- -->
+
+Now we’re wondering what the quantity sold per week is, and we can get
+this with `week_year` and `week_qty`.
+
+``` r
+labs_quantity_per_week <- ggplot2::labs(
          x = "Week", 
          y = "Quantity Sold",
-         title = "Quantity Per Week") -> ggWowQuantity
+         title = "Quantity Per Week") 
+
+ggWowQuantity <- WeekOverWeek %>%
+  # drop missing
+    tidyr::drop_na() %>%
+  # plot week_year on the x
+    ggplot2::ggplot(data = ., 
+           aes(x = week_year, 
+               # and week quantity on the y
+               y = week_qty)) + 
+  # add the line plot
+    ggplot2::geom_line() +
+  # add the smooth (predictor)
+    ggplot2::geom_smooth() +
+  # add points
+    ggplot2::geom_point() +
+    labs_quantity_per_week
 ggWowQuantity
 ```
 
-    #>  `geom_smooth()` using method = 'loess' and formula 'y ~ x'
-
 ![](figs/ggWowQuantity-1.png)<!-- -->
 
+These were used in the previous graph:
+
 ``` r
-OnlineRetailRaw %>% glimpse(78)
+    stat_summary(fun.y = mean,
+                 geom = "bar") +
+    stat_summary(fun.data = mean_cl_boot,
+                 geom = "errorbar",
+                 width = 0.3) +
 ```
 
-    #>  Observations: 541,909
-    #>  Variables: 8
-    #>  $ invoice_no   <chr> "536365", "536365", "536365", "536365", "536365", "536…
-    #>  $ stock_code   <chr> "85123A", "71053", "84406B", "84029G", "84029E", "2275…
-    #>  $ description  <chr> "WHITE HANGING HEART T-LIGHT HOLDER", "WHITE METAL LAN…
-    #>  $ quantity     <dbl> 6, 6, 8, 6, 6, 2, 6, 6, 6, 32, 6, 6, 8, 6, 6, 3, 2, 3,…
-    #>  $ invoice_date <chr> "12/1/2010 8:26", "12/1/2010 8:26", "12/1/2010 8:26", …
-    #>  $ unit_price   <dbl> 2.55, 3.39, 2.75, 3.39, 3.39, 7.65, 4.25, 1.85, 1.85, …
-    #>  $ customer_id  <dbl> 17850, 17850, 17850, 17850, 17850, 17850, 17850, 17850…
-    #>  $ country      <chr> "United Kingdom", "United Kingdom", "United Kingdom", …
+But I opted for the line + points.
 
-## Create Monthly Sales data
+## Create Monthly Sales by Location
 
 Next we create the monthly sales data frame, with the `unit_price`,
-`quantity`, `country`, and `floor_month`
+`quantity`, `location`, and `floor_month`.
 
 ``` r
-MonthlySales <- OnlineRetail %>% 
-    # get the floor_month. country, quantity, and unit_price
+MonthlyLocationSales <- CannabisWowData %>% 
+    # get the floor_month. location, quantity, and unit_price
     dplyr::select(floor_month, 
-                  country, 
-                  quantity, 
+                  location, 
+                  quantity,  
                   unit_price) %>%
     # we can create the "sales"
     dplyr::mutate(sales = quantity*unit_price) %>%
-    # now we group by the floor_month and country
-    dplyr::group_by(floor_month, country) %>%
-    # and summarize this by the monthly_sales adn median sales
-    dplyr::summarize(monthly_sales = sum(sales), 
-                     median_sales = median(sales)) %>%
-    # and group it by the floor_month and country
-    group_by(floor_month, country)
+    # now we group by the floor_month and location
+    dplyr::group_by(floor_month, location) %>%
+    # and summarize this by the monthly_sales and median sales
+    dplyr::summarize(total_monthly_sales = sum(sales, na.rm = TRUE), 
+                     median_monthly_sales = median(sales, na.rm = TRUE)) %>%
+    # and group it by the floor_month and location
+    dplyr::group_by(floor_month, location) %>% 
+    # remove the SP location
+    dplyr::filter(location != "SP")
 # check new data 
-MonthlySales %>% dplyr::glimpse(78)
+MonthlyLocationSales %>% dplyr::glimpse(78)
 ```
 
-    #>  Observations: 300
+    #>  Observations: 138
     #>  Variables: 4
-    #>  Groups: floor_month, country [300]
-    #>  $ floor_month   <date> 2019-12-01, 2019-12-01, 2020-01-01, 2020-01-01, 2020…
-    #>  $ country       <chr> "Sweden", "United Kingdom", "Australia", "Austria", "…
-    #>  $ monthly_sales <dbl> 507.56, 14442.92, 9017.71, 364.60, -205.74, 1154.05, …
-    #>  $ median_sales  <dbl> 17.000, 7.925, 33.000, 22.650, -205.740, 17.700, 17.3…
+    #>  Groups: floor_month, location [138]
+    #>  $ floor_month          <date> 2019-12-01, 2019-12-01, 2020-01-01, 2020-01-0…
+    #>  $ location             <chr> "California", "Washington", "Arizona", "Britis…
+    #>  $ total_monthly_sales  <dbl> 30.18, 19.45, 149.95, 122.22, 1477.13, 140.53,…
+    #>  $ median_monthly_sales <dbl> 12.960, 9.725, 13.800, 31.200, 6.960, 5.405, 5…
+
+This gives us a grouped `data.frame` with 138 rows.
+
+## Plot Monthly Sales by Location
+
+This plot will graph the monthly sales of cannabis products by their
+location (abbreviated).
 
 ``` r
-MonthlySales %>% nrow()
-```
+# labels
+labs_monthly_location_sales <- ggplot2::labs(y = 'Total Monthly Sales',
+                  x = 'Month',
+                  title = 'Total Monthly Sales By Location')
 
-    #>  [1] 300
-
-``` r
-ggTop100MonthlyCountrySales <- MonthlySales %>%
-    # sort these by monthly_sales
-    dplyr::arrange(desc(monthly_sales)) %>% 
-    # get the top 100 sales
-    utils::head(100) %>% 
+# plot
+ggTop100MonthlyLocationSales <- MonthlyLocationSales %>%
+    # sort these by total_monthly_sales
+    dplyr::arrange(desc(total_monthly_sales)) %>% 
     # plot this as floor_month vs. monthly sales
     ggplot2::ggplot(data = ., 
+                    # month
                     aes(x = floor_month, 
-                        y = monthly_sales)) +
+                        # total monthly sales here
+                        y = total_monthly_sales)) +
     # add a line
     ggplot2::geom_line() +
     # and a point
     ggplot2::geom_point() +
     # and a theme
-    ggplot2::theme(axis.title = element_text()) +   
+    ggplot2::theme(axis.title = 
+                     element_text()) +   
     # with legend title
-    ggplot2::theme(legend.title = element_blank()) +
+    ggplot2::theme(legend.title = 
+                     element_blank()) +
     # and the scales for dollar formats
-    ggplot2::scale_y_continuous(labels = scales::dollar_format(accuracy = 1)) +
-    ggplot2::facet_wrap(. ~ country, 
-                        scales = "free") + 
-    ggplot2::labs(y = 'Sales',
-                  x = 'Month',
-                  title = 'Monthly Sales') 
-
-ggTop100MonthlyCountrySales 
+    ggplot2::scale_y_continuous(labels = 
+                                  scales::dollar_format(accuracy = 1)) +
+    # facet by the location
+    ggplot2::facet_wrap(. ~ location, 
+                        scales = "free", 
+                        ncol = 4) + 
+    # adjust the x axis text
+    ggplot2::theme(axis.text.x = 
+                     element_text(angle = 45, 
+                                  hjust = 0.5, 
+                                  vjust = 0.5)) +
+    # 
+    labs_monthly_location_sales
+ggTop100MonthlyLocationSales 
 ```
 
-    #>  geom_path: Each group consists of only one observation. Do you need to adjust
-    #>  the group aesthetic?
-    #>  geom_path: Each group consists of only one observation. Do you need to adjust
-    #>  the group aesthetic?
-    #>  geom_path: Each group consists of only one observation. Do you need to adjust
-    #>  the group aesthetic?
-    #>  geom_path: Each group consists of only one observation. Do you need to adjust
-    #>  the group aesthetic?
+![](figs/ggTop100MonthlyLocationSales-1.png)<!-- -->
 
-![](figs/ggTop100MonthlyCountrySales-1.png)<!-- -->
+Faceting by location and having months on the x axis is helpful for
+spotting trends, but graphs like this can help us spot gaps in total
+sales by location (i.e. California vs. Manitoba).
 
-## Median Order Value
+## Median Order Sales by Location
 
 This is the median sales by `floor_month`, sorted by the `median_sales`.
 
 ``` r
-MonthlySales %>%
+# labels
+labs_median_order_value <- ggplot2::labs(
+                  y = 'Median Monthly Sales', 
+                  x = 'Floor Month',
+                  title = 'Median Monthly Sales by Location')
+# plot
+ggMedianOrderValue <- MonthlyLocationSales %>%
     # sort these by median_sales
-    dplyr::arrange(desc(median_sales)) %>% 
-    # get the top 100 sales
-    utils::head(50) %>% 
+    dplyr::arrange(desc(median_monthly_sales)) %>% 
+    # plot
     ggplot2::ggplot(data = ., 
+                    # put months on the x 
            mapping = aes(x = floor_month, 
-                         y = median_sales)) +
+                         # median monthly sales
+                         y = median_monthly_sales)) +
+    # add the line
     ggplot2::geom_line() +
-    # 
+    # add the point
     ggplot2::geom_point() +
-    # 
-    ggplot2::scale_y_continuous(labels = scales::dollar_format(accuracy = 1)) +
-    ggplot2::facet_wrap(~ country, 
-               scales = "free") + 
-    ggplot2::labs(y = 'Sales', 
-                  x = 'Month',
-                  title = 'Median Order Value') -> ggMedianOrderValue
+    # add the y format
+    ggplot2::scale_y_continuous(labels = 
+                                    scales::dollar_format(accuracy = 1)) +
+  
+    # facet this by the location and set scales to free
+    ggplot2::facet_wrap(. ~ location, 
+                        scales = "free") + 
+  
+      # adjust the x axis text
+    ggplot2::theme(axis.text.x = 
+                     element_text(angle = 45, 
+                                  hjust = 0.5, 
+                                  vjust = 0.5)) +
+  # add the labels
+  labs_median_order_value
+
 ggMedianOrderValue
 ```
 
@@ -294,11 +496,11 @@ We also create three variables that aggregate the sales (`sum` and
 `median`).
 
 ``` r
-CustomerSales <- OnlineRetail %>%
+CustomerSales <- CannabisWowData %>%
     # select the customer_id, quantity, and unit_price
-    dplyr::select(customer_id, quantity, unit_price) %>%
+    dplyr::select(id, quantity, unit_price) %>%
     # group it by the customer id
-    dplyr::group_by(customer_id) %>%
+    dplyr::group_by(id) %>%
     # create sales (which is the product of quantity and price)
     dplyr::mutate(sales = (quantity * unit_price)) %>%
     # summarize
@@ -308,45 +510,45 @@ CustomerSales <- OnlineRetail %>%
             quantity_sum = sum(quantity),
             quantiy_median = median(quantity)) %>%
     # we group this again by customer id
-    dplyr::group_by(customer_id)
+    dplyr::group_by(id)
 CustomerSales %>% dplyr::glimpse(78)
 ```
 
-    #>  Observations: 4,373
+    #>  Observations: 1,253
     #>  Variables: 5
-    #>  Groups: customer_id [4,373]
-    #>  $ customer_id    <dbl> 12346, 12347, 12348, 12349, 12350, 12352, 12353, 123…
-    #>  $ sales_sum      <dbl> 0.00, 4310.00, 1797.24, 1757.55, 334.40, 1545.41, 89…
-    #>  $ sales_median   <dbl> 0.000, 17.000, 41.760, 17.700, 19.800, 17.400, 18.80…
-    #>  $ quantity_sum   <dbl> 0, 2458, 2341, 631, 197, 470, 20, 530, 240, 1591, 27…
-    #>  $ quantiy_median <dbl> 0, 12, 72, 6, 12, 4, 5, 6, 6, 24, 16, 12, 4, 8, 10, …
+    #>  Groups: id [1,253]
+    #>  $ id             <dbl> 1, 7, 8, 9, 15, 16, 17, 18, 19, 22, 25, 27, 28, 29, …
+    #>  $ sales_sum      <dbl> 11.58, 13.24, 4.95, 32.85, 5.40, 2.49, 17.70, 3.36, …
+    #>  $ sales_median   <dbl> 5.790, 6.620, 4.950, 32.850, 2.700, 2.490, 17.700, 3…
+    #>  $ quantity_sum   <dbl> 2, 2, 3, 3, 2, 1, 6, 1, 1, 1, 1, 12, 4, 2, 2, 8, 2, …
+    #>  $ quantiy_median <dbl> 1, 1, 3, 3, 1, 1, 6, 1, 1, 1, 1, 6, 1, 1, 1, 1, 1, 1…
 
-## Customer country data
+## Customer location data
 
 We now join the `CustomerSales` data to a data frame with the distinct
-customer ids and countries (`CustomersCountry`).
+customer ids and countries (`CustomersLocation`).
 
 ``` r
-CustomersCountry <- OnlineRetail %>%
-    dplyr::distinct(customer_id, country) %>%
-    dplyr::group_by(customer_id)
-# join this to the CustomerSales
-CustomersSalesCountry <- CustomerSales %>%
-    dplyr::inner_join(CustomersCountry, 
-               by = "customer_id")
+CustomersLocation <- CannabisWowData %>%
+    dplyr::distinct(id, location) %>%
+    dplyr::group_by(id)
+# join this to the CustomersLocation
+CustomersSalesLocation <- CustomerSales %>%
+    dplyr::inner_join(CustomersLocation, 
+               by = "id")
 # check
-CustomersSalesCountry %>% dplyr::glimpse(78)
+CustomersSalesLocation %>% dplyr::glimpse(78)
 ```
 
-    #>  Observations: 4,389
+    #>  Observations: 1,253
     #>  Variables: 6
-    #>  Groups: customer_id [4,373]
-    #>  $ customer_id    <dbl> 12346, 12347, 12348, 12349, 12350, 12352, 12353, 123…
-    #>  $ sales_sum      <dbl> 0.00, 4310.00, 1797.24, 1757.55, 334.40, 1545.41, 89…
-    #>  $ sales_median   <dbl> 0.000, 17.000, 41.760, 17.700, 19.800, 17.400, 18.80…
-    #>  $ quantity_sum   <dbl> 0, 2458, 2341, 631, 197, 470, 20, 530, 240, 1591, 27…
-    #>  $ quantiy_median <dbl> 0, 12, 72, 6, 12, 4, 5, 6, 6, 24, 16, 12, 4, 8, 10, …
-    #>  $ country        <chr> "United Kingdom", "Iceland", "Finland", "Italy", "No…
+    #>  Groups: id [1,253]
+    #>  $ id             <dbl> 1, 7, 8, 9, 15, 16, 17, 18, 19, 22, 25, 27, 28, 29, …
+    #>  $ sales_sum      <dbl> 11.58, 13.24, 4.95, 32.85, 5.40, 2.49, 17.70, 3.36, …
+    #>  $ sales_median   <dbl> 5.790, 6.620, 4.950, 32.850, 2.700, 2.490, 17.700, 3…
+    #>  $ quantity_sum   <dbl> 2, 2, 3, 3, 2, 1, 6, 1, 1, 1, 1, 12, 4, 2, 2, 8, 2, …
+    #>  $ quantiy_median <dbl> 1, 1, 3, 3, 1, 1, 6, 1, 1, 1, 1, 6, 1, 1, 1, 1, 1, 1…
+    #>  $ location       <chr> "California", "California", "California", "Californi…
 
 ### Create cluster (modeling) data frame
 
@@ -368,7 +570,7 @@ skimr::skim(CustomerSalesClust)
 |                                                  |                    |
 | :----------------------------------------------- | :----------------- |
 | Name                                             | CustomerSalesClust |
-| Number of rows                                   | 4317               |
+| Number of rows                                   | 1222               |
 | Number of columns                                | 5                  |
 | \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_   |                    |
 | Column type frequency:                           |                    |
@@ -380,13 +582,13 @@ Data summary
 
 **Variable type: numeric**
 
-| skim\_variable  | n\_missing | complete\_rate |     mean |      sd |      p0 |     p25 |      p50 |      p75 |   p100 | hist  |
-| :-------------- | ---------: | -------------: | -------: | ------: | ------: | ------: | -------: | -------: | -----: | :---- |
-| customer\_id    |          0 |              1 | 15300.12 | 1720.24 | 12347.0 | 13815.0 | 15299.00 | 16778.00 |  18287 | ▇▇▇▇▇ |
-| sales\_sum      |          0 |              1 |  1925.71 | 8267.65 |     2.9 |   302.7 |   658.26 |  1627.13 | 279489 | ▇▁▁▁▁ |
-| sales\_median   |          0 |              1 |    26.71 |  112.67 |  \-30.6 |     8.5 |    15.40 |    17.70 |   3861 | ▇▁▁▁▁ |
-| quantity\_sum   |          0 |              1 |  1134.13 | 4697.46 |     0.0 |   159.0 |   373.00 |   978.00 | 196719 | ▇▁▁▁▁ |
-| quantiy\_median |          0 |              1 |    16.40 |   98.41 |  \-36.0 |     3.0 |     8.00 |    12.00 |   4300 | ▇▁▁▁▁ |
+| skim\_variable  | n\_missing | complete\_rate |   mean |     sd |   p0 |    p25 |    p50 |     p75 |    p100 | hist  |
+| :-------------- | ---------: | -------------: | -----: | -----: | ---: | -----: | -----: | ------: | ------: | :---- |
+| id              |          0 |              1 | 861.03 | 487.61 | 1.00 | 440.50 | 873.50 | 1282.75 | 1680.00 | ▇▇▇▇▇ |
+| sales\_sum      |          0 |              1 |  43.86 | 139.07 | 0.39 |   7.37 |  19.09 |   39.80 | 3635.76 | ▇▁▁▁▁ |
+| sales\_median   |          0 |              1 |  16.58 |  39.93 | 0.39 |   4.13 |   9.87 |   16.65 |  757.63 | ▇▁▁▁▁ |
+| quantity\_sum   |          0 |              1 |  23.30 | 114.16 | 1.00 |   2.00 |   6.00 |   20.00 | 3576.00 | ▇▁▁▁▁ |
+| quantiy\_median |          0 |              1 |   8.27 |  21.13 | 1.00 |   1.00 |   3.00 |    9.75 |  540.00 | ▇▁▁▁▁ |
 
 ## k-means clustering
 
@@ -420,22 +622,22 @@ CustomerSalesClust2 <- textshape::column_to_rownames(CustomerSalesClust)
 utils::str(CustomerSalesClust)
 ```
 
-    #>  'data.frame':   4317 obs. of  5 variables:
-    #>   $ customer_id   : num  12347 12348 12349 12350 12352 ...
-    #>   $ sales_sum     : num  4310 1797 1758 334 1545 ...
-    #>   $ sales_median  : num  17 41.8 17.7 19.8 17.4 ...
-    #>   $ quantity_sum  : num  2458 2341 631 197 470 ...
-    #>   $ quantiy_median: num  12 72 6 12 4 5 6 6 24 16 ...
+    #>  'data.frame':   1222 obs. of  5 variables:
+    #>  $ id : num 1 7 8 9 15 16 17 18 ...
+    #>  $ sales_sum : num 11.58 13.24 4.95 32.85 ...
+    #>  $ sales_median : num 5.79 6.62 4.95 32.85 ...
+    #>  $ quantity_sum : num 2 2 3 3 2 1 6 1 ...
+    #>  $ quantiy_median: num 1 1 3 3 1 1 6 1 ...
 
 ``` r
 utils::str(CustomerSalesClust2)
 ```
 
-    #>  'data.frame':   4317 obs. of  4 variables:
-    #>   $ sales_sum     : num  4310 1797 1758 334 1545 ...
-    #>   $ sales_median  : num  17 41.8 17.7 19.8 17.4 ...
-    #>   $ quantity_sum  : num  2458 2341 631 197 470 ...
-    #>   $ quantiy_median: num  12 72 6 12 4 5 6 6 24 16 ...
+    #>  'data.frame':   1222 obs. of  4 variables:
+    #>  $ sales_sum : num 11.58 13.24 4.95 32.85 ...
+    #>  $ sales_median : num 5.79 6.62 4.95 32.85 ...
+    #>  $ quantity_sum : num 2 2 3 3 2 1 6 1 ...
+    #>  $ quantiy_median: num 1 1 3 3 1 1 6 1 ...
 
 The `CustomerSalesClust2` took the existing data frame
 (`CustomerSalesClust`) and removed a column (`customer_id`) and assigned
@@ -445,7 +647,7 @@ them a rowname `base::rownames()`.
 base::rownames(CustomerSalesClust2) %>% head()
 ```
 
-    #>  [1] "12347" "12348" "12349" "12350" "12352" "12353"
+    #>  [1] "1"  "7"  "8"  "9"  "15" "16"
 
 2.  The 2nd step is to Scale the new `CustomerSalesClust` with
     `base::scale()`, which now has been transformed via the
@@ -460,14 +662,14 @@ CustomerSalesClust3 <- base::scale(CustomerSalesClust2)
 str(CustomerSalesClust3)
 ```
 
-    #>   num [1:4317, 1:4] 0.2884 -0.0155 -0.0203 -0.1925 -0.046 ...
-    #>   - attr(*, "dimnames")=List of 2
-    #>    ..$ : chr [1:4317] "12347" "12348" "12349" "12350" ...
-    #>    ..$ : chr [1:4] "sales_sum" "sales_median" "quantity_sum" "quantiy_median"
-    #>   - attr(*, "scaled:center")= Named num [1:4] 1925.7 26.7 1134.1 16.4
-    #>    ..- attr(*, "names")= chr [1:4] "sales_sum" "sales_median" "quantity_sum" "quantiy_median"
-    #>   - attr(*, "scaled:scale")= Named num [1:4] 8267.7 112.7 4697.5 98.4
-    #>    ..- attr(*, "names")= chr [1:4] "sales_sum" "sales_median" "quantity_sum" "quantiy_median"
+    #>  num [1:1222, 1:4] -0.2321 -0.2202 -0.2798 -0.0792 ...
+    #>  - attr(*, "dimnames")=List of 2
+    #>  ..$ : chr [1:1222] "1" "7" "8" ...
+    #>  ..$ : chr [1:4] "sales_sum" "sales_median" "quantity_sum" ...
+    #>  - attr(*, "scaled:center")= Named num [1:4] 43.86 16.58 23.3 8.27
+    #>  ..- attr(*, "names")= chr [1:4] "sales_sum" "sales_median" "quantity_sum" ...
+    #>  - attr(*, "scaled:scale")= Named num [1:4] 139.1 39.9 114.2 21.1
+    #>  ..- attr(*, "names")= chr [1:4] "sales_sum" "sales_median" "quantity_sum" ...
 
 Use the `kmeans()` function with the specifications below:
 
@@ -483,16 +685,16 @@ k2 <- kmeans(CustomerSalesClust,
 k2
 ```
 
-    #>  K-means clustering with 2 clusters of sizes 4310, 7
+    #>  K-means clustering with 2 clusters of sizes 592, 630
     #>  
     #>  Cluster means:
-    #>    customer_id  sales_sum sales_median quantity_sum quantiy_median
-    #>  1    15299.63   1654.774     26.53051     995.7596       16.32889
-    #>  2    15598.71 168745.324    136.80571   86332.7143       60.28571
+    #>           id sales_sum sales_median quantity_sum quantiy_median
+    #>  1  425.8666  51.25693     19.20398     29.82939        9.88598
+    #>  2 1269.9476  36.90537     14.11969     17.16349        6.75000
     #>  
     #>  Clustering vector:
     #>     [1] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>    [38] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+    #>    [38] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
     #>    [75] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
     #>   [112] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
     #>   [149] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
@@ -507,111 +709,28 @@ k2
     #>   [482] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
     #>   [519] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
     #>   [556] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>   [593] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>   [630] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>   [667] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>   [704] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>   [741] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>   [778] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>   [815] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>   [852] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>   [889] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>   [926] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>   [963] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1000] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1037] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1074] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1111] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1148] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1185] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1222] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1259] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1296] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1
-    #>  [1333] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1370] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1407] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1444] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1481] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1518] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1555] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1592] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1629] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1666] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1703] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1740] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1777] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1814] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1851] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1888] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1925] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1962] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [1999] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2036] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2073] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2110] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2147] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2184] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2221] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2258] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2295] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2332] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2369] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2406] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2443] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2480] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2517] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2554] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2591] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2628] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2665] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2702] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2739] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2776] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2813] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2850] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2887] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2924] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2961] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [2998] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3035] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3072] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3109] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3146] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3183] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3220] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3257] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3294] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3331] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3368] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3405] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3442] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3479] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3516] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3553] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3590] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3627] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3664] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3701] 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3738] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3775] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3812] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3849] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3886] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3923] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3960] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [3997] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [4034] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [4071] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [4108] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [4145] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [4182] 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [4219] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [4256] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-    #>  [4293] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+    #>   [593] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>   [630] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>   [667] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>   [704] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>   [741] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>   [778] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>   [815] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>   [852] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>   [889] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>   [926] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>   [963] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>  [1000] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>  [1037] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>  [1074] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>  [1111] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>  [1148] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>  [1185] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+    #>  [1222] 2
     #>  
     #>  Within cluster sum of squares by cluster:
-    #>  [1] 109330454524  47779160273
-    #>   (between_SS / total_SS =  61.0 %)
+    #>  [1] 73977903 40773432
+    #>   (between_SS / total_SS =  65.5 %)
     #>  
     #>  Available components:
     #>  
@@ -629,11 +748,11 @@ CustomerSalesCluser <- base::data.frame(CustomerSalesClust, k2$cluster)
 CustomerSalesCluser %>% dplyr::glimpse(78)
 ```
 
-    #>  Observations: 4,317
+    #>  Observations: 1,222
     #>  Variables: 6
-    #>  $ customer_id    <dbl> 12347, 12348, 12349, 12350, 12352, 12353, 12354, 123…
-    #>  $ sales_sum      <dbl> 4310.00, 1797.24, 1757.55, 334.40, 1545.41, 89.00, 1…
-    #>  $ sales_median   <dbl> 17.000, 41.760, 17.700, 19.800, 17.400, 18.800, 16.9…
-    #>  $ quantity_sum   <dbl> 2458, 2341, 631, 197, 470, 20, 530, 240, 1591, 2708,…
-    #>  $ quantiy_median <dbl> 12, 72, 6, 12, 4, 5, 6, 6, 24, 16, 12, 4, 8, 10, 6, …
+    #>  $ id             <dbl> 1, 7, 8, 9, 15, 16, 17, 18, 19, 22, 25, 27, 28, 29, …
+    #>  $ sales_sum      <dbl> 11.58, 13.24, 4.95, 32.85, 5.40, 2.49, 17.70, 3.36, …
+    #>  $ sales_median   <dbl> 5.790, 6.620, 4.950, 32.850, 2.700, 2.490, 17.700, 3…
+    #>  $ quantity_sum   <dbl> 2, 2, 3, 3, 2, 1, 6, 1, 1, 1, 1, 12, 4, 2, 2, 8, 2, …
+    #>  $ quantiy_median <dbl> 1, 1, 3, 3, 1, 1, 6, 1, 1, 1, 1, 6, 1, 1, 1, 1, 1, 1…
     #>  $ k2.cluster     <int> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1…
