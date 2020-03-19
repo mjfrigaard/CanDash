@@ -47,7 +47,7 @@ knitr::opts_knit$set(
 
 # Motivation
 
-This script outlines the steps to wrangle the Cannabis data. We used an open online retail data set for the week-over-week visualizations (`OnlineRetail`), and combined this with categories from the [`kushyapp`](https://github.com/kushyapp/cannabis-dataset).
+This script outlines the steps to wrangle the Cannabis data. We used an open online retail data set from the [UCI Machine Learning Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail) for the week-over-week visualizations (`OnlineRetail`), and combined this with categories from the [`kushyapp`](https://github.com/kushyapp/cannabis-dataset).
 
 ## Import data 
 

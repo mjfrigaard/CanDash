@@ -1,0 +1,169 @@
+---
+title: "CanDash (a minimal cannabis dashboard)"
+author: "Martin Frigaard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    social: menu
+    source_code: embed
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+# packages ------
+library(flexdashboard)
+library(shiny)
+library(tidyverse)
+library(magrittr)
+```
+
+```{r load-data, echo=FALSE}
+# fs::dir_tree("data/processed/")
+# load these data into the dashboard
+CannabisWowData <- read_csv("data/processed/2020-03-17-CannabisWowData.csv")
+```
+
+
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+```{r yearNum-dateRangeInput, eval=TRUE}
+# define yearNum inputId -----
+dateRangeInput(
+            inputId = "dateNum",
+            label = h3("Sales Date"),
+               start = "2019-12-01", 
+               end = "2020-12-31",
+               min = "2020-01-04",
+               max = "2020-12-23", 
+               format = "yyyy-mm-dd", 
+               startview = "month", 
+               weekstart = 0,
+               language = "en", 
+               separator = " to ", 
+               width = NULL)
+```
+
+
+```{r component-selectInput, eval=FALSE}
+selectInput(inputId = "component",
+                    selected = "component_01",
+                    label = "Component (1-11)",
+                    choices = levels(SparkComp$comp_key),
+                    multiple = FALSE)
+```
+
+Select the project `date` to see the `value` and per `component` on Spark projects. 
+
+Row
+-----------------------------------------------------------------------
+
+### Heatmap
+
+```{r heatmap-date, eval=TRUE}
+# define reactive
+HeatMapData <- reactive({
+        
+  # rename this reactive to generic data
+        
+        data <- SparkComp
+        
+        # subset this by the year the user selects
+        # this might be a little faster if we change the
+        # functions to dplyr instead of base R functions
+        
+        data <- dplyr::filter(
+           
+            data,
+            
+            date >= input$yearNum[1] & date <= input$yearNum[2]
+        ) 
+        
+        data <- data %>% 
+          
+            group_by(year_qtr, comp_val) %>% 
+  
+            summarise(value_year_qtr = sum(value)) %>% 
+  
+            inner_join(., y = data, 
+                       
+                       by = c("year_qtr","comp_val")) 
+          
+        data
+    })
+# render plot with reactive -----
+renderPlot({
+
+        data <- HeatMapData()
+        
+        data %>% 
+
+            ggplot(aes(x = year_qtr,
+                       
+                       y = comp_val,
+                       
+                       fill = value_year_qtr)) +
+          
+            geom_tile() +
+          
+            theme(axis.text.x = element_text(angle = -45,
+                                             vjust = 1.00,
+                                             hjust = 0.20),
+                  legend.position = "top") +
+                  ylab(NULL) +
+                  xlab("Year - quarter")
+    })
+```
+
+
+Row
+-----------------------------------------------------------------------
+
+```{r geom_line-status-week, eval=TRUE}
+LinePlotData <- reactive({
+        
+  # rename this reactive to generic data
+        
+        data <- SparkComp
+        
+        # subset this by the year the user selects
+        # this might be a little faster if we change the
+        # functions to dplyr instead of base R functions
+        
+        data <- dplyr::filter(
+           
+            data,
+            
+            date >= input$yearNum[1] & date <= input$yearNum[2]
+        ) 
+        
+        data <- data %>% 
+          
+              group_by(month) %>% 
+  
+               summarise(value_month = sum(value)) %>% 
+  
+               inner_join(., y = data, by = c("month"))
+          
+        data
+    })
+
+renderPlot({
+  
+data <- LinePlotData() 
+
+data %>% 
+    
+  ggplot2::ggplot(aes(y = value_month, 
+                      
+                      x = month)) +
+  geom_point() +
+        ylab("Value") +
+        xlab("Month")
+})
+```
+
+
+
+
+

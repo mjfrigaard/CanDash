@@ -1,0 +1,209 @@
+---
+title: "Part 3 - K-Means Cannabis Data"
+author: "Martin Frigaard"
+date: "current version: `r Sys.Date()`"
+output: github_document
+---
+
+
+```{r setup, include=FALSE}
+require(knitr)
+require(rmdformats)
+require(tidyverse)
+require(plotly)
+require(janitor)
+require(skimr)
+require(mosaic)
+require(inspectdf)
+require(visdat)
+require(DT)
+require(hrbrthemes)
+# base options ----
+base::options(
+  tibble.print_max = 25,
+  tibble.width = 78,
+  scipen = 100000000,
+  max.print = 999999,
+  str = strOptions(
+      strict.width = "wrap", 
+      vec.len = 3, 
+      drop.deparse.attr = TRUE)
+)
+# knitr chunk options ----
+knitr::opts_chunk$set(
+  echo = TRUE, # show/hide all code
+  # results = "hide", # hide results
+  tidy = FALSE, # cleaner code printing
+  comment = "#> ", # better console printing
+  eval = TRUE, # turn this to FALSE stop code chunks from running
+  fig.width = 9, # figure width
+  fig.height = 6.5, # figure height
+  warning = FALSE, # show warnings
+  message = FALSE,
+  size = "small", # size of the text
+  fig.path = "figs/"  # location of files
+)
+# knitr knit settings ----
+knitr::opts_knit$set(
+  width = 78
+)
+```
+
+## Load the packages
+
+These are the packages we will use to visualize the cannabis data. 
+
+```{r package, message=FALSE, warning=FALSE}
+library(readr)
+library(tidyverse)
+library(lubridate)
+library(ggthemes)
+library(cluster)
+library(factoextra)
+library(textshape)
+library(knitr)
+library(rmdformats)
+library(plotly)
+require(janitor)
+require(skimr)
+library(mosaic)
+library(inspectdf)
+library(visdat)
+library(DT)
+library(hrbrthemes)
+```
+
+## Import data 
+
+This data came from a UK e-commerce dataset from the [UCI Machine Learning Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail) and the [kushy cannabis data set](https://github.com/kushyapp/cannabis-dataset). 
+
+```{r import-CannabisWowData, message=FALSE, warning=FALSE}
+# fs::dir_tree("data/processed/")
+CannabisWowData <- read_csv("data/processed/2020-03-17-CannabisWowData.csv")
+```
+
+```{r check-glimpse}
+CannabisWowData %>% dplyr::glimpse() 
+```
+
+## Create Customer Sales data
+
+These data are the sales by customer id. We create this data frame by grouping on `customer_id`, then create a `sales` variable by multiplying the quantity by the unit price (`quantity * unit_price`).
+
+We also create three variables that aggregate the sales (`sum` and `median`).
+
+```{r CustomerSales}
+CustomerSales <- CannabisWowData %>%
+    # select the customer_id, quantity, and unit_price
+    dplyr::select(id, quantity, unit_price) %>%
+    # group it by the customer id
+    dplyr::group_by(id) %>%
+    # create sales (which is the product of quantity and price)
+    dplyr::mutate(sales = (quantity * unit_price)) %>%
+    # summarize
+    dplyr::summarize(
+            sales_sum = sum(sales),
+            sales_median = median(sales),
+            quantity_sum = sum(quantity),
+            quantiy_median = median(quantity)) %>%
+    # we group this again by customer id
+    dplyr::group_by(id)
+CustomerSales %>% dplyr::glimpse(78)
+```
+
+## Customer location data
+
+We now join the `CustomerSales` data to a data frame with the distinct customer ids and countries (`CustomersLocation`).
+
+```{r join-CustomersCountry}
+CustomersLocation <- CannabisWowData %>%
+    dplyr::distinct(id, location) %>%
+    dplyr::group_by(id)
+# join this to the CustomersLocation
+CustomersSalesLocation <- CustomerSales %>%
+    dplyr::inner_join(CustomersLocation, 
+               by = "id")
+# check
+CustomersSalesLocation %>% dplyr::glimpse(78)
+```
+
+### Create cluster (modeling) data frame
+
+Ok, now we are going to convert the grouped data frame, drop the missing rows, and remove any data where sales were less than zero.
+
+```{r CustomerSalesClust}
+# convert to data frame
+CustomerSalesClust <- base::data.frame(CustomerSales)
+
+CustomerSalesClust <- CustomerSalesClust %>%  
+    # drop na 
+                        tidyr::drop_na() %>%
+    # remove sales less than 0
+                        dplyr::filter(sales_sum > 0)
+skimr::skim(CustomerSalesClust)
+```
+
+***
+
+## K-Means clustering
+
+Finally, we run a k-means clustering algorithm on the clustered sales data. *What does a k-means clustering do?* Well, here is a great definition on [Medium](https://towardsdatascience.com/understanding-k-means-clustering-in-machine-learning-6a6e67336aa1), 
+
+> the objective of K-means is simple: group similar data points together and discover underlying patterns. To achieve this objective, K-means looks for a fixed number (k) of clusters in a dataset.
+
+The k-means algorithm is an **unsupervised machine learning algorithm.** The steps to perform this are: 
+
+1. Use the `textshape::column_to_rownames()` function on the clustered data frame. This function 
+
+> "*Takes an existing column and uses it as rownames instead. This is useful when turning a data.frame into a matrix. Inspired by the tibble package's `column_to_row` which is now deprecated if done on a `tibble` object. By coercing to a `data.frame` this problem is avoided.*"
+
+We're going to use the non-descript name, `CustomerSalesClust2`. to show what this function is actually doing. The `utils::str()` function gives us some information on what kind of object we've created here.
+
+```{r column_to_rownames}
+CustomerSalesClust2 <- textshape::column_to_rownames(CustomerSalesClust) 
+utils::str(CustomerSalesClust)
+utils::str(CustomerSalesClust2)
+```
+
+The `CustomerSalesClust2` took the existing data frame (`CustomerSalesClust`) and removed a column (`customer_id`) and assigned them a rowname `base::rownames()`.
+
+```{r rownames}
+base::rownames(CustomerSalesClust2) %>% head()
+```
+
+
+2. The 2nd step is to Scale the new `CustomerSalesClust` with `base::scale()`, which now has been transformed via the `textshape::column_to_rownames()` function. The `scale()` function who's, "*default method centers and/or scales the columns of a numeric matrix.*"
+
+```{r scale}
+CustomerSalesClust3 <- base::scale(CustomerSalesClust2)
+str(CustomerSalesClust3)
+```
+
+Use the `kmeans()` function with the specifications below:
+
+`centers` = A matrix of cluster centres.
+`nstart` = 
+
+```{r k2}
+k2 <- kmeans(CustomerSalesClust, 
+             # the number of cluster centries
+             centers = 2 , 
+             ## random starts do help here with too many clusters
+             ## (and are often recommended anyway!):
+             nstart = 25)
+k2
+```
+
+
+```{r five-cluster}
+fviz_cluster(k2, data = CustomerSalesClust3)
+```
+
+```{r CustomerSalesCluser}
+CustomerSalesCluser <- base::data.frame(CustomerSalesClust, k2$cluster)
+CustomerSalesCluser %>% dplyr::glimpse(78)
+```
+
+
+
+
