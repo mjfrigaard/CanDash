@@ -1,0 +1,12 @@
+name: candash-flex
+title: candash-flex
+username:
+account: mjfrigaard
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 1970802
+bundleId: 2902024
+url: https://mjfrigaard.shinyapps.io/candash-flex/
+when: 1584713417.24999
+asMultiple: FALSE
+asStatic: FALSE

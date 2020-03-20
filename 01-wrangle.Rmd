@@ -121,28 +121,28 @@ There are far more invoice numbers than stock codes, so these are a better bet f
 
 I will group these by the invoice number and get the total cost of the sale by multiplying the unit price by the number of units sold (quantity).
 
-### Create a 'cost-per-invoice' data set
+### Create a 'amount-per-invoice' data set
 
-This will group the data by the invoice number and calculate the cost per invoice (`cost_per_invoice`) by multiplying quantity and unit price. 
+This will group the data by the invoice number and calculate the cost per invoice (`amnt_per_invoice`) by multiplying quantity and unit price. 
 
-```{r CostPerInvoice}
-CostPerInvoice <- SmOnlineRetail %>% 
+```{r AmntPerInvoice}
+AmntPerInvoice <- SmOnlineRetail %>% 
   group_by(invoice_no) %>% 
-  dplyr::mutate(cost_per_invoice = quantity*unit_price) %>% 
+  dplyr::mutate(amnt_per_invoice = quantity*unit_price) %>% 
   dplyr::ungroup() %>% 
   dplyr::select(invoice_no, 
                 invoice_date,
                 quantity, 
                 unit_price, 
-                cost_per_invoice,
+                amnt_per_invoice,
                 dplyr::everything(),
                 -c(country))
-CostPerInvoice %>% head()
+AmntPerInvoice %>% head()
 ```
 
 We can check the calculations by taking a quick case (invoice `548920`). 
 
-```{r test-cost_per_invoice}
+```{r test-amnt_per_invoice}
 # quantity * unit_price
 5*2.95
 ```
@@ -197,7 +197,7 @@ KushyBrands %>%
   dplyr::count(name, sort = TRUE) 
 ```
 
-The output above shows us there are `1776` unique observations in the `name` variable, but two of them (`Brewbudz by Cannabiniers` and `Dixie Elixirs & Edibles`) appear more than once. If there are `1776` unique brand names, I might want to check another variable before linking to the `CostPerInvoice` to the `KushyBrands` data frame...
+The output above shows us there are `1776` unique observations in the `name` variable, but two of them (`Brewbudz by Cannabiniers` and `Dixie Elixirs & Edibles`) appear more than once. If there are `1776` unique brand names, I might want to check another variable before linking to the `AmntPerInvoice` to the `KushyBrands` data frame...
 
 ### Kushy brand categories 
 
@@ -435,7 +435,7 @@ This shows there are around 1233 brands in the `TidyProdCat` data set. We'll loo
 
 ## Join brands with cost per invoice
 
-Here we're going to combine the distinct names for `product_name` with the `CostPerInvoice` data frame. 
+Here we're going to combine the distinct names for `product_name` with the `AmntPerInvoice` data frame. 
 
 First I will get a data frame with only the distinct names of each product, sorted with the most common products first. 
 
@@ -492,30 +492,30 @@ This might not make sense, because the ids might not be actually linked, but we 
 
 #### Derive sample of invoices, sorted by quantity
 
-Now I want to get a sample from the `CostPerInvoice` table that is the same size of the online retail data, but first make sure these are sorted by the `quantity`. I also want to add an id that matches the id's in the `TidyProductsBrands`.
+Now I want to get a sample from the `AmntPerInvoice` table that is the same size of the online retail data, but first make sure these are sorted by the `quantity`. I also want to add an id that matches the id's in the `TidyProductsBrands`.
 
 Here is the kicker--I need the ids to be sorted in the *exact* same arrangement (by `prod_name_count`) because these will align with the `quantity` (i.e. most common products sync up with most sold `quantity`).
 
-```{r CostPerInvSamp}
-CostPerInvSamp <- CostPerInvoice %>% 
+```{r AmntPerInvSamp}
+AmntPerInvSamp <- AmntPerInvoice %>% 
   dplyr::sample_n(size = 2799) %>% 
   dplyr::arrange(desc(quantity)) %>% 
     # remove the description and customer_id
   dplyr::select(-description, 
                 -customer_id)
-CostPerInvSamp %>% glimpse(78)
+AmntPerInvSamp %>% glimpse(78)
 ```
 
 Now we can bind these together and reorganize the data into an arrangement that makes sense (and allows us to check our work).
 
 ```{r CannabisWowData}
-CannabisWowData <- CostPerInvSamp %>% 
+CannabisWowData <- AmntPerInvSamp %>% 
   dplyr::bind_cols(TidyProductsBrands) %>% 
   dplyr::select(id, 
                 location, 
                 quantity, 
                 unit_price, 
-                cost_per_invoice, 
+                amnt_per_invoice, 
                 product_name, 
                 prod_name_count,
                 product_category,

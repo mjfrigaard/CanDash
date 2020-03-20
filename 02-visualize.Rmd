@@ -79,11 +79,14 @@ This data came from a UK e-commerce dataset from the [UCI Machine Learning Labor
 
 ```{r import-CannabisWowData, message=FALSE, warning=FALSE}
 # fs::dir_tree("data/processed/")
-CannabisWowData <- read_csv("data/processed/2020-03-17-CannabisWowData.csv")
+CannabisWowData <- read_csv("data/processed/2020-03-19-CannabisWowData.csv")
 ```
 
 ```{r check-glimpse}
-CannabisWowData %>% dplyr::glimpse() 
+CanData <- CannabisWowData %>% 
+  # remove product data
+  dplyr::select(-dplyr::contains("prod")) 
+CanData %>% dplyr::glimpse(78)
 ```
 
 This `data.frame` is a combination of some sales data with some product and brand data. 
@@ -110,15 +113,16 @@ ggplot2::theme_set(hrbrthemes::theme_ipsum_rc(
 These are the most common brands categories. 
 
 ```{r visualize-brand_category}
-CannabisWowData %>% 
+CanData %>% 
   dplyr::count(brand_category, sort = TRUE) %>% 
+  utils::head(5) %>% 
   dplyr::mutate(brand_category = reorder(brand_category, n)) %>%
   ggplot2::ggplot(aes(x = brand_category, y = n)) +
     ggplot2::geom_col(aes(fill = brand_category), 
                       show.legend = FALSE) +
     ggplot2::labs(x = "Brand Category",
                   y = "Count",
-                  title = "Most Common Cannabis Brand Categories") +
+                  title = "Top 10 Cannabis Brand Categories") +
     ggplot2::coord_flip()
 ```
 
@@ -129,24 +133,86 @@ This tells me there are 17 different categories for brands, and `Concentrates` a
 These are the most common product categories, sorted with the most common first. 
 
 ```{r visualize-product_category}
-CannabisWowData %>% 
-  dplyr::count(product_category, sort = TRUE) %>% 
-  dplyr::mutate(product_category = reorder(product_category, n)) %>%
-  ggplot2::ggplot(aes(x = product_category, y = n)) +
-    ggplot2::geom_col(aes(fill = product_category), 
+CanData %>% 
+  dplyr::count(brand) %>%
+  utils::head(10) %>% 
+  dplyr::mutate(brand = reorder(brand, n)) %>%
+  ggplot2::ggplot(aes(x = brand, y = n)) +
+    ggplot2::geom_col(aes(fill = brand), 
                       show.legend = FALSE) +
-    ggplot2::labs(x = "Product Category",
+    ggplot2::labs(x = "Brands",
                   y = "Count",
-                  title = "Most Common Cannabis Product Categories") +
+                  title = "Top 20 Cannabis Brands") +
     ggplot2::coord_flip()
 ```
+
+## Most common brand & brand categories
+
+Now we can group these two varibles and count them both, limniting this to the top 50. 
+
+```{r top50-brand-categories}
+CanData %>% 
+  dplyr::count(brand, brand_category) %>%
+  dplyr::arrange(desc(n)) %>% 
+  dplyr::filter(brand_category %in% c("Concentrates", "Edibles", 
+                                      "Flower", "Medical")) %>% 
+  utils::head(50) %>% 
+  dplyr::mutate(brand = reorder(brand, n)) %>%
+  ggplot2::ggplot(aes(x = brand, y = n, 
+                      group = brand_category)) +
+    ggplot2::geom_col(aes(fill = brand), 
+                      show.legend = FALSE) +
+    ggplot2::labs(x = "Brands",
+                  y = "Count",
+                  title = "Top 50 Cannabis Brands & Categories") +
+    ggplot2::coord_flip() + 
+    facet_wrap(. ~ brand_category, 
+               scales = "free")
+```
+
+
+```{r GroupedCanData}
+library(highcharter)
+library(viridisLite)
+library(treemap)
+
+thm <- 
+  hc_theme(
+    colors = c("#1a6ecc", "#434348", "#90ed7d"),
+    chart = list(
+      backgroundColor = "transparent",
+      style = list(fontFamily = "Ubuntu")
+    ),
+    xAxis = list(
+      gridLineWidth = 1
+    )
+  )
+
+GroupedCanData <- CanData %>%
+  dplyr::group_by(brand_category, quantity) %>% 
+  dplyr::summarise(sales_by_cat = n()) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::sample_n(20)
+# GroupedCanData
+
+highcharter::hctreemap2(GroupedCanData, 
+              group_vars = c("brand_category"),
+              size_var = "sales_by_cat", 
+              color_var = "sales_by_cat",
+              layoutAlgorithm = "squarified",
+              levelIsConstant = FALSE,
+              allowDrillToNode = TRUE,
+              palette = rev(viridis(6))) %>% 
+  hc_add_theme(thm)
+```
+
 
 ## Creating week over week data 
 
 The code below creates a data.frame that is 'week-over-week', which is not an uncommon way of reporting sales data. 
 
 ```{r WeekOverWeek}
-WeekOverWeek <- CannabisWowData %>%
+WeekOverWeek <- CanData %>%
     # get the week_year by quantity
   select(week_year, quantity) %>%
     # group these data
@@ -165,14 +231,14 @@ WeekOverWeek <- CannabisWowData %>%
     # and we group this final data set by the week_year variable
   group_by(week_year)
 # check this data set
-WeekOverWeek %>% utils::str()
+WeekOverWeek %>% dplyr::glimpse(78)
 ```
 
-Here we see there is a data.frame with 52 rows (one for each week).
+Here we see there is a data.frame with 52 rows (one for each week). And this data set is still grouped, but that won't be an issue.
 
 ## Plot annual sales (by week)
 
-These are the annual sales (line plots) by week, faceted by month. 
+First we will reset the graph theme to a little smaller font to allow the dates to show up on the x-axis. 
 
 ```{r adjust-theme-for-line-charts}
 # set theme
@@ -188,7 +254,7 @@ ggplot2::theme_set(hrbrthemes::theme_ipsum_rc(
 
 ## Week over week annual Sales
 
-These are the week over week annual sales. 
+These are the week over week annual sales (quantity), faceted by month. 
 
 ```{r ggWoWAnnualSales}
   # these are the labels
@@ -199,7 +265,9 @@ labs_wow_annual_sales <- ggplot2::labs(
   subtitle = "Simulated Cannabis Sales Data",
   caption = "graphic and analysis by PDG") 
 
-ggWoWAnnualSales <- WeekOverWeek %>% 
+WeekOverWeek %>% 
+  
+  tidyr::drop_na() %>% 
   # this will put week_year on the x
     ggplot2::ggplot(aes(x = week_year, 
                         # and the week over week quantity on the y
@@ -223,11 +291,117 @@ ggWoWAnnualSales <- WeekOverWeek %>%
                                   hjust = 0.5, 
                                   vjust = 0.5)) +
   labs_wow_annual_sales
-ggWoWAnnualSales 
+```
+
+This shows some missing data in December, and a lot of variation in the sales from month to month. 
+
+### Week over week invoice amount
+
+This will give the user a categorical variable to filter the week over week sales by the amount per invoice.  
+
+```{r WowAmntPerInvoice}
+WowAmntPerInvoice <- CanData %>%
+  
+  # get the week_year by amnt_per_invoice
+  select(week_year, amnt_per_invoice) %>%
+  
+  # group these data by week year
+  group_by(week_year) %>%
+  
+  # summarize the data by weekly quantity
+  summarize(week_amnt_per_inv = sum(amnt_per_invoice)) %>%
+  
+  # This introduces the lag function, "compute a lagged version of a time 
+  # series, shifting the time base back by a given number of observations.
+  mutate(prev_week_amnt_per_inv = lag(week_amnt_per_inv, 1)) %>%
+  
+  # now we get the ratio of the difference between the weekly quantity and 
+  # the previous week, and we divide that by the previous week.
+  mutate(wow_cost_per_inv = (week_amnt_per_inv - prev_week_amnt_per_inv) / 
+                                                     prev_week_amnt_per_inv) %>%
+  
+  # now we calculate the month, using week_year, abbreviations, and labels
+  mutate(month = month(week_year, abbr = TRUE, label = TRUE)) %>%
+  
+  # finally, we group this final data set by the week_year variable
+  group_by(week_year)
+
+# check this data set
+WowAmntPerInvoice %>% glimpse()
+```
+
+```{r labs_wow_amnt_per_invoice}
+  # these are the labels
+labs_wow_amnt_per_invoice <- ggplot2::labs(
+  y = 'Inoive', 
+  x = 'Week', 
+  title = 'Week Over Week Amount Per Invoice',
+  subtitle = "quantity*unit_price by invoice number",
+  caption = "graphic and analysis by PDG") 
+
+
 ```
 
 
-This shows some missing data in December, and a lot of variance in the sales from month to month. We can check the missing data for December using the data summary below.
+### Week over week by brand category plot
+
+The data we created above allows us to plot the week over week sales by their brand categories. 
+
+We will plot these data by quarters: 
+
+- Q1 = Oct, Nov, and Dec   
+- Q2 = Jan, Feb, and Mar  
+- Q3 is Apr, May, and Jun   
+- Q4 is Jul, Aug, and Sep  
+
+```{r week-over-week-by-brand-categories}
+# these are the labels
+labs_wow_brand_cat_annual_sales <- ggplot2::labs(
+  y = 'Sales', 
+  x = 'Week', 
+  title = 'Week Over Week Sales By Brand Category',
+  subtitle = "Simulated Cannabis Sales Data",
+  caption = "graphic and analysis by PDG") 
+
+WowCostPerInvoice %>% 
+  # filter to Q3
+  dplyr::filter(month %in% c("Apr", "May", "Jun") & 
+                  # only concentrates and flowers
+           brand_category %in% c("Concentrates", "Flower", "Medical")) %>% 
+  # remove missing 
+  tidyr::drop_na() %>% 
+  # this will put week_year on the x
+    ggplot2::ggplot(aes(x = week_year, 
+                        # and the week over week quantity on the y
+                        y = wow_brand_quantity,
+                        group = brand_category)) +
+  # add the line plot
+    ggplot2::geom_line() +
+  # and the point
+    ggplot2::geom_point() +
+  # the axis title here will inherit the size and color
+    ggplot2::theme(axis.title = element_text(face = c("bold"))) +
+  # this will remove the legend
+    ggplot2::theme(legend.title = element_blank()) +
+  # this adds the percent on the y axis
+    ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1),) +
+  # here we facet by the month
+    ggplot2::facet_wrap(brand_category ~ month, 
+                        # 
+                        scales = "free") + 
+    ggplot2::theme(axis.text.x = 
+                     element_text(angle = 45, 
+                                  hjust = 0.5, 
+                                  vjust = 0.5)) +
+  labs_wow_brand_cat_annual_sales
+```
+
+```{r}
+BrandCatWeekOverWeek %>% 
+  dplyr::filter(month %in% c("May") & 
+           brand_category %in% c("Concentrates"))
+```
+
 
 ```{r missing-dec-19-quantity}
 knitr::kable(
@@ -236,6 +410,7 @@ WeekOverWeek %>%
   dplyr::select(week_year, 
                 wow_quantity))
 ```
+
 We can see the data are missing for December of 2019. We'll remove this and plot the non-missing data. 
 
 ```{r december}
