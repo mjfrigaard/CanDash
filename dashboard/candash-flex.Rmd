@@ -17,60 +17,26 @@ library(magrittr)
 # fs::dir_tree("data/processed/")
 # load the data into the dashboard
 CanData <- readr::read_csv("data/processed/2020-03-19-CannabisWowData.csv")
+Top50Data <- readr::read_csv("data/processed/2020-03-21-Top50Data.csv")
 MonLocSales <- readr::read_csv("data/processed/2020-03-19-MonthlyLocationSales.csv")
 WeekOverWeek <- readr::read_csv("data/processed/2020-03-19-WeekOverWeek.csv")
+
+Q3Data <- WeekOverWeek %>% 
+  tidyr::drop_na() %>% 
+  dplyr::filter(.data = ., month %in% c("Apr", "May", "Jun")) 
 ```
 
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+This is a sample sales dashboard for cannabis products. 
 
 Column {data-width=600}
 -----------------------------------------------------------------------
 
-### Top 20 Cannabis Brands
+### Quantity sold per week
 
-```{r top-20-brands, eval=TRUE}
-# create reactive
-Top20React <- reactive({
-  # rename this reactive to generic data
-        data <- CanData
-        
-          
-          data <- dplyr::count(data, brand) %>%
-          
-          utils::head(10) %>% 
-          
-          dplyr::mutate(brand = reorder(brand, n))
-          
-          data
-        
-    })
-
-# render plot with reactive -----
-renderPlot({
-  
-  data <- Top20React()
-  
-    data %>% 
-      
-      ggplot2::ggplot(aes(x = brand, y = n)) +
-      
-        ggplot2::geom_col(aes(fill = brand), 
-                          
-                          show.legend = FALSE) +
-      
-        ggplot2::labs(x = "Brands",
-                      
-                      y = "Count",
-                      
-                      title = "Top 20 Cannabis Brands") +
-      
-        ggplot2::coord_flip()
-})
-```
-
-
-### Week over week sales 
-
-```{r wow-plot}
+```{r quantity-sold-per-week, eval=TRUE}
 # create reactive
 WowReact <- reactive({
   # rename this reactive to generic data
@@ -82,19 +48,63 @@ WowReact <- reactive({
           data
         
     })
-  # these are the labels
-labs_wow_annual_sales <- ggplot2::labs(
-  y = 'Sales', 
-  x = 'Week', 
-  title = 'Week Over Week Annual Sales',
-  subtitle = "Simulated Cannabis Sales Data",
-  caption = "graphic and analysis by PDG") 
 
+labs_quantity_per_week <- ggplot2::labs(
+         x = "Week", 
+         y = "Quantity Sold",
+         title = "Quantity Per Week") 
 
 # render plot with reactive -----
 renderPlot({
   
    data <- WowReact()
+   
+    ggplot2::ggplot(data = data, 
+               aes(x = week_year, 
+                   # and week quantity on the y
+                   y = week_qty)) + 
+      # add the line plot
+        ggplot2::geom_line() +
+      # add the smooth (predictor)
+        ggplot2::geom_smooth() +
+      # add points
+        ggplot2::geom_point() +
+      # add labels
+        labs_quantity_per_week
+})
+```
+
+
+### Week over week sales 
+
+```{r wow-plot}
+# set theme
+ggplot2::theme_set(hrbrthemes::theme_ipsum_rc(
+  base_size = 10,
+  strip_text_size = 11,
+  axis_title_size = 9,
+  plot_title_size = 15,
+  subtitle_size = 13
+))
+# create reactive
+Q3DataReact <- reactive({
+  # rename this reactive to generic data
+        data <- Q3Data
+        
+    })
+  # these are the labels
+labs_wow_annual_sales <- ggplot2::labs(
+  y = 'Sales', 
+  x = 'Week', 
+  title = 'Week Over Week Annual Sales',
+  subtitle = "Quarter 3 Simulated Cannabis Sales Data",
+  caption = "Graphic and analysis by PDG") 
+
+
+# render plot with reactive -----
+renderPlot({
+  
+   data <- Q3DataReact()
    
    data %>% 
   
@@ -135,7 +145,7 @@ Column {.tabset data-width=400}
 library(highcharter)
 library(viridisLite)
 library(treemap)
-
+# set the theme for highcharter --------
 thm <- 
   hc_theme(
     colors = c("#1a6ecc", "#434348", "#90ed7d"),
@@ -147,14 +157,15 @@ thm <-
       gridLineWidth = 1
     )
   )
-
+# grouped cannabis data --------
 GroupedCanData <- CanData %>%
   dplyr::group_by(brand_category, quantity) %>% 
   dplyr::summarise(sales_by_cat = n()) %>% 
   dplyr::ungroup() %>% 
-  dplyr::sample_n(20)
+  dplyr::sample_n(100)
 # GroupedCanData
 
+# treemap --------
 highcharter::hctreemap2(GroupedCanData, 
               group_vars = c("brand_category"),
               size_var = "sales_by_cat", 
@@ -163,11 +174,48 @@ highcharter::hctreemap2(GroupedCanData,
               levelIsConstant = FALSE,
               allowDrillToNode = TRUE,
               palette = rev(viridis(6))) %>% 
-  hc_add_theme(thm)
+  highcharter::hc_add_theme(thm)
 ```
 
 ### Best Sellers
 
-```{r barchart}
+```{r top-50-brands-categories}
+# create reactive
+Top50React <- reactive({
+  # rename this reactive to generic data
+        data <- Top50Data
+        
+          data
+        
+    })
 
+# render plot with reactive -----
+renderPlot({
+  
+  data <- Top50React()
+  
+    data %>% 
+      
+    ggplot2::ggplot(aes(x = brand, 
+                      
+                      y = brand_cat_count, 
+                      
+                      group = brand_category)) +
+      
+    ggplot2::geom_col(aes(fill = brand), 
+                      
+                      show.legend = FALSE) +
+      
+    ggplot2::labs(x = "Brands",
+                  
+                  y = "Count",
+                  
+                  title = "Top 50 Cannabis Brands & Categories") +
+      
+    ggplot2::coord_flip() +
+      
+    facet_wrap(. ~ brand_category, 
+               
+               scales = "free")
+})
 ```

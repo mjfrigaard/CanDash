@@ -5,8 +5,8 @@ account: mjfrigaard
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 1970802
-bundleId: 2902024
+bundleId: 2905956
 url: https://mjfrigaard.shinyapps.io/candash-flex/
-when: 1584713417.24999
+when: 1584814310.15458
 asMultiple: FALSE
 asStatic: FALSE

@@ -151,14 +151,20 @@ CanData %>%
 Now we can group these two varibles and count them both, limniting this to the top 50. 
 
 ```{r top50-brand-categories}
-CanData %>% 
+Top50Data <- CanData %>% 
   dplyr::count(brand, brand_category) %>%
   dplyr::arrange(desc(n)) %>% 
+  dplyr::rename(brand_cat_count = n) %>% 
   dplyr::filter(brand_category %in% c("Concentrates", "Edibles", 
                                       "Flower", "Medical")) %>% 
   utils::head(50) %>% 
-  dplyr::mutate(brand = reorder(brand, n)) %>%
-  ggplot2::ggplot(aes(x = brand, y = n, 
+  dplyr::mutate(brand = reorder(brand, brand_cat_count)) 
+
+# Top50Data
+
+Top50Data %>%
+  ggplot2::ggplot(aes(x = brand, 
+                      y = brand_cat_count, 
                       group = brand_category)) +
     ggplot2::geom_col(aes(fill = brand), 
                       show.legend = FALSE) +
@@ -192,7 +198,7 @@ GroupedCanData <- CanData %>%
   dplyr::group_by(brand_category, quantity) %>% 
   dplyr::summarise(sales_by_cat = n()) %>% 
   dplyr::ungroup() %>% 
-  dplyr::sample_n(20)
+  dplyr::sample_n(100)
 # GroupedCanData
 
 highcharter::hctreemap2(GroupedCanData, 
@@ -263,11 +269,15 @@ labs_wow_annual_sales <- ggplot2::labs(
   x = 'Week', 
   title = 'Week Over Week Annual Sales',
   subtitle = "Simulated Cannabis Sales Data",
-  caption = "graphic and analysis by PDG") 
+  caption = "Graphic and analysis by PDG") 
 
 WeekOverWeek %>% 
   
   tidyr::drop_na() %>% 
+  
+            dplyr::filter(.data = ., 
+                          
+                          month %in% c("Apr", "May", "Jun")) %>% 
   # this will put week_year on the x
     ggplot2::ggplot(aes(x = week_year, 
                         # and the week over week quantity on the y
@@ -338,8 +348,6 @@ labs_wow_amnt_per_invoice <- ggplot2::labs(
   title = 'Week Over Week Amount Per Invoice',
   subtitle = "quantity*unit_price by invoice number",
   caption = "graphic and analysis by PDG") 
-
-
 ```
 
 
@@ -353,55 +361,6 @@ We will plot these data by quarters:
 - Q2 = Jan, Feb, and Mar  
 - Q3 is Apr, May, and Jun   
 - Q4 is Jul, Aug, and Sep  
-
-```{r week-over-week-by-brand-categories}
-# these are the labels
-labs_wow_brand_cat_annual_sales <- ggplot2::labs(
-  y = 'Sales', 
-  x = 'Week', 
-  title = 'Week Over Week Sales By Brand Category',
-  subtitle = "Simulated Cannabis Sales Data",
-  caption = "graphic and analysis by PDG") 
-
-WowCostPerInvoice %>% 
-  # filter to Q3
-  dplyr::filter(month %in% c("Apr", "May", "Jun") & 
-                  # only concentrates and flowers
-           brand_category %in% c("Concentrates", "Flower", "Medical")) %>% 
-  # remove missing 
-  tidyr::drop_na() %>% 
-  # this will put week_year on the x
-    ggplot2::ggplot(aes(x = week_year, 
-                        # and the week over week quantity on the y
-                        y = wow_brand_quantity,
-                        group = brand_category)) +
-  # add the line plot
-    ggplot2::geom_line() +
-  # and the point
-    ggplot2::geom_point() +
-  # the axis title here will inherit the size and color
-    ggplot2::theme(axis.title = element_text(face = c("bold"))) +
-  # this will remove the legend
-    ggplot2::theme(legend.title = element_blank()) +
-  # this adds the percent on the y axis
-    ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1),) +
-  # here we facet by the month
-    ggplot2::facet_wrap(brand_category ~ month, 
-                        # 
-                        scales = "free") + 
-    ggplot2::theme(axis.text.x = 
-                     element_text(angle = 45, 
-                                  hjust = 0.5, 
-                                  vjust = 0.5)) +
-  labs_wow_brand_cat_annual_sales
-```
-
-```{r}
-BrandCatWeekOverWeek %>% 
-  dplyr::filter(month %in% c("May") & 
-           brand_category %in% c("Concentrates"))
-```
-
 
 ```{r missing-dec-19-quantity}
 knitr::kable(
@@ -623,5 +582,10 @@ write_csv(as.data.frame(MonthlyLocationSales),
                         base::noquote(lubridate::today()),
                         "-MonthlyLocationSales.csv"))
 
-fs::dir_tree("data/processed/", recurse = FALSE)
+write_csv(as.data.frame(Top50Data), 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-Top50Data.csv"))
+
+fs::dir_ls("data/processed/", recurse = FALSE)
 ```
