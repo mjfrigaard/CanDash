@@ -1,0 +1,59 @@
+input[type="number"] {
+  max-width: 100%;
+}
+
+/* Customize fonts */
+body, label, input, button, select { 
+  font-family: 'Helvetica Neue', "Open-Sans", Helvetica;
+  font-weight: 200;
+}
+h1, h2, h3, h4 { font-weight: 400; }
+
+/* Navbar */
+.navbar {
+  background-color:#73aa73;
+  border-color:black;
+}
+
+.navbar-brand {
+color:black;
+}
+
+/* Sidebar section */
+
+.section.sidebar {
+  background-color: white; 
+}
+
+.js-irs-0 .irs-bar {
+
+border-top-color: #443A83;
+
+border-bottom-color: #443A83;
+
+} 
+
+/*  
+.outer {
+  position: fixed;
+  top: 35px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  padding: 0;
+}
+*/
+
+
+
+
+/* Appearance */
+#controls {
+  background-color: white;
+  padding: 0 10px 10px 10px;
+  cursor: move; /* Fade out while not hovering */
+  opacity: 0.55;
+  zoom: 0.9;
+  transition: opacity 500ms 1s;
+}

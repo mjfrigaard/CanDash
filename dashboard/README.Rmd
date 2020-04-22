@@ -1,0 +1,72 @@
+---
+title: "CanDash - dashboards for cannabis data"
+output: 
+  github_document: 
+    toc: yes
+    df_print: kable
+---
+
+
+```{r setup, echo=FALSE, cache=FALSE, include=FALSE}
+library(knitr)
+library(rmdformats)
+require(tidyverse)
+require(plotly)
+require(ggforce)
+require(styler)
+require(janitor)
+require(skimr)
+library(gh)
+library(mosaic)
+library(inspectdf)
+library(visdat)
+library(DT)
+library(formatR)
+library(hrbrthemes)
+library(gcookbook)
+library(stringi)
+library(ggbeeswarm)
+library(listviewer)
+library(hrbrthemes)
+# chunk options ----
+knitr::opts_chunk$set(
+  echo = TRUE, # show/hide all code
+  tidy = FALSE, # cleaner code printing
+  comment = "#> ", # better console printing
+  eval = TRUE, # turn this to FALSE stop code chunks from running
+  message = FALSE, # show messages
+  warning = FALSE, # show warnings
+  fig.width = 10, # figure width
+  fig.height = 7, # figure height
+  size = "small", # size of the text
+  fig.path = "figs/" # location of figures
+) 
+# knit options ----
+knitr::opts_knit$set(
+  width = 78
+)
+# base options ----
+base::options(
+  max.print="75",
+  tibble.print_max = 25,
+  tibble.width = 78,
+  scipen = 100000000,
+  max.print = 999999
+)
+```
+
+This document covers some of the specifications of the `CanDash` dashboards. 
+
+## Week over week sales dashboard 
+
+The sales dashboard is visible below.
+
+```{r front-cover, echo=FALSE}
+knitr::include_graphics(path = "figs/front-cover.png")
+```
+
+A full demo version of this application is available [here.](https://mfrigaard.shinyapps.io/candash-sales-003/) 
+
+## Sales by location  
+
+## Order size 

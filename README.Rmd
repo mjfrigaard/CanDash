@@ -1,5 +1,5 @@
 ---
-title: "CanDash - A Cannabis Dashboard"
+title: "CanDash - Cannabis Dashboards"
 output: github_document
 ---
 
@@ -72,13 +72,13 @@ The data for the dashboard are imported below.
 
 ```{r import-CannabisWowData, message=FALSE, warning=FALSE}
 # fs::dir_tree("data/processed/")
-CannabisWowData <- read_csv("data/processed/2020-03-17-CannabisWowData.csv")
+CannabisWowData <- read_csv("data/processed/2020-04-17-CannabisWowData.csv")
 CannabisWowData %>% dplyr::glimpse(78)
 ```
 
 ## Date ranges 
 
-```{r}
+```{r date-ranges}
 CannabisWowData %>% 
   dplyr::summarize(min_invoice_date = min(invoice_date, na.rm = TRUE),
                    max_invoice_date = max(invoice_date, na.rm = TRUE),
@@ -108,8 +108,27 @@ CannabisWowCats <- CannabisWowData %>%
 CannabisWowCats %>% inspectdf::show_plot(text_labels = TRUE) 
 ```
 
+We can see the overwhelming number of the data are from `California`, in the months of `Nov/Oct`, etc.
 
+## Numerical data 
 
+These are the categorical variables in the `CannabisWowData`. 
+
+```{r CannabisWowNums}
+CannabisWowNums <- CannabisWowData %>%
+  # get numeric variables 
+  dplyr::select(c(amnt_per_invoice, 
+                  quantity, 
+                  unit_price, 
+                  prod_name_count)) %>% 
+  inspectdf::inspect_num()
+CannabisWowNums %>% 
+  # plot these with color and layout
+  inspectdf::show_plot(col_palette = 2, 
+                       plot_layout = c(2, 2)) 
+```
+
+Here we can see the `amnt_per_invoice`, `prod_name_count`, `quantity`, and `unit_price` are skewed heavily towards 0. 
 
 
 

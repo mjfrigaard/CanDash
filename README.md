@@ -1,4 +1,4 @@
-CanDash - A Cannabis Dashboard
+CanDash - Cannabis Dashboards
 ================
 
 ## Overview
@@ -16,6 +16,7 @@ File/folder structure
     #>  ├── CanDash.Rproj
     #>  ├── README.Rmd
     #>  ├── README.md
+    #>  ├── code
     #>  ├── dashboard
     #>  ├── data
     #>  ├── docs
@@ -65,7 +66,22 @@ fs::dir_tree("data", recurse = TRUE)
     #>      ├── 2020-03-17-CannabisWowData.csv
     #>      ├── 2020-03-19-CannabisWowData.csv
     #>      ├── 2020-03-19-MonthlyLocationSales.csv
-    #>      └── 2020-03-19-WeekOverWeek.csv
+    #>      ├── 2020-03-19-WeekOverWeek.csv
+    #>      ├── 2020-03-21-Top50Data.csv
+    #>      ├── 2020-04-17-CannabisWowData.csv
+    #>      ├── 2020-04-17-MonthlyLocationSales.csv
+    #>      ├── 2020-04-17-Top50Data.csv
+    #>      ├── 2020-04-17-WeekOverWeek.csv
+    #>      ├── 2020-04-21-MonthlyLocationSales.csv
+    #>      ├── 2020-04-21-MonthlyLocationSales.rds
+    #>      ├── 2020-04-21-Top100BrandCatsData.csv
+    #>      ├── 2020-04-21-Top100BrandCatsData.rds
+    #>      ├── 2020-04-21-Top25Data.csv
+    #>      ├── 2020-04-21-Top25Data.rds
+    #>      ├── 2020-04-21-Top50Data.csv
+    #>      ├── 2020-04-21-Top50Data.rds
+    #>      ├── 2020-04-21-WeekOverWeek.csv
+    #>      └── 2020-04-21-WeekOverWeek.rds
 
 ## Import
 
@@ -73,29 +89,29 @@ The data for the dashboard are imported below.
 
 ``` r
 # fs::dir_tree("data/processed/")
-CannabisWowData <- read_csv("data/processed/2020-03-17-CannabisWowData.csv")
+CannabisWowData <- read_csv("data/processed/2020-04-17-CannabisWowData.csv")
 CannabisWowData %>% dplyr::glimpse(78)
 ```
 
-    #>  Observations: 2,799
-    #>  Variables: 21
+    #>  Rows: 2,799
+    #>  Columns: 21
     #>  $ id               <dbl> 404, 404, 404, 404, 404, 404, 216, 216, 216, 216, …
     #>  $ location         <chr> "California", "California", "California", "Califor…
-    #>  $ quantity         <dbl> 1296, 600, 600, 480, 360, 240, 240, 200, 192, 150,…
-    #>  $ unit_price       <dbl> 1.06, 0.42, 1.79, 0.36, 0.42, 2.55, 0.39, 1.74, 0.…
-    #>  $ cost_per_invoice <dbl> 1373.76, 252.00, 1074.00, 172.80, 151.20, 612.00, …
+    #>  $ quantity         <dbl> 800, 720, 720, 480, 400, 400, 288, 216, 200, 200, …
+    #>  $ unit_price       <dbl> 0.00, 2.55, 0.85, 0.42, 1.25, 1.45, 0.10, 0.18, 1.…
+    #>  $ amnt_per_invoice <dbl> 0.00, 1836.00, 612.00, 201.60, 500.00, 580.00, 28.…
     #>  $ product_name     <chr> "Sour Diesel", "Sour Diesel", "Sour Diesel", "Sour…
     #>  $ prod_name_count  <dbl> 480, 480, 480, 480, 480, 480, 423, 423, 423, 423, …
     #>  $ product_category <chr> "Flowers", "Flowers", "Flowers", "Pre-Roll", "Pre-…
-    #>  $ invoice_date     <date> 2020-10-07, 2020-07-24, 2020-10-06, 2020-04-18, 2…
-    #>  $ dow              <dbl> 7, 24, 6, 18, 18, 6, 28, 11, 8, 21, 12, 21, 23, 3,…
-    #>  $ week             <dbl> 41, 30, 40, 16, 12, 49, 44, 41, 15, 47, 28, 47, 21…
+    #>  $ invoice_date     <date> 2020-05-27, 2020-10-11, 2020-11-16, 2020-07-24, 2…
+    #>  $ dow              <dbl> 27, 11, 16, 24, 10, 5, 1, 18, 7, 6, 23, 25, 2, 19,…
+    #>  $ week             <dbl> 22, 41, 46, 30, 10, 40, 48, 42, 41, 45, 47, 30, 31…
     #>  $ yr               <dbl> 2020, 2020, 2020, 2020, 2020, 2020, 2020, 2020, 20…
-    #>  $ week_year        <date> 2020-10-04, 2020-07-19, 2020-10-04, 2020-04-12, 2…
-    #>  $ month            <chr> "Oct", "Jul", "Oct", "Apr", "Mar", "Dec", "Oct", "…
-    #>  $ floor_month      <date> 2020-10-01, 2020-07-01, 2020-10-01, 2020-04-01, 2…
-    #>  $ invoice_no       <dbl> 570097, 561051, 569815, 550344, 546992, 580985, 57…
-    #>  $ stock_code       <chr> "20971", "21977", "85099F", "22546", "21977", "226…
+    #>  $ week_year        <date> 2020-05-24, 2020-10-11, 2020-11-15, 2020-07-19, 2…
+    #>  $ month            <chr> "May", "Oct", "Nov", "Jul", "Mar", "Oct", "Nov", "…
+    #>  $ floor_month      <date> 2020-05-01, 2020-10-01, 2020-11-01, 2020-07-01, 2…
+    #>  $ invoice_no       <dbl> 554857, 570557, 576827, 561055, 546154, 569570, 57…
+    #>  $ stock_code       <chr> "POST", "22273", "21787", "23307", "62018", "22652…
     #>  $ product_details  <chr> "Pre-roll", "Pre-roll", "Pre-roll", "Pre-roll", "P…
     #>  $ brand            <chr> "Medi Cone", "Medi Cone", "Medi Cone", "Medi Cone"…
     #>  $ brand_name       <chr> "Day Dreamers", "Day Dreamers", "Day Dreamers", "D…
@@ -141,3 +157,29 @@ CannabisWowCats %>% inspectdf::show_plot(text_labels = TRUE)
 ```
 
 ![](figs/CannabisWowCats-1.png)<!-- -->
+
+We can see the overwhelming number of the data are from `California`, in
+the months of `Nov/Oct`, etc.
+
+## Numerical data
+
+These are the categorical variables in the `CannabisWowData`.
+
+``` r
+CannabisWowNums <- CannabisWowData %>%
+  # get numeric variables 
+  dplyr::select(c(amnt_per_invoice, 
+                  quantity, 
+                  unit_price, 
+                  prod_name_count)) %>% 
+  inspectdf::inspect_num()
+CannabisWowNums %>% 
+  # plot these with color and layout
+  inspectdf::show_plot(col_palette = 2, 
+                       plot_layout = c(2, 2)) 
+```
+
+![](figs/CannabisWowNums-1.png)<!-- -->
+
+Here we can see the `amnt_per_invoice`, `prod_name_count`, `quantity`,
+and `unit_price` are skewed heavily towards 0.

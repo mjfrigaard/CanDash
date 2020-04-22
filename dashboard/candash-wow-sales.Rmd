@@ -1,0 +1,297 @@
+---
+title: "CanDash (a minimal cannabis dashboard)"
+author: "Martin Frigaard"
+output: 
+  flexdashboard::flex_dashboard:
+    navbar:
+      - { title: "Author", href: "https://martinfrigaard.io/" }
+    orientation: columns
+    social: menu
+    css: style.css
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+# packages ------
+library(flexdashboard)
+library(shiny)
+library(tidyverse)
+library(magrittr)
+library(plotly)
+library(highcharter)
+library(viridisLite)
+library(treemap)
+library(RColorBrewer)
+library(ggthemes)
+# fs::dir_tree("data/processed/")
+# load the data into the dashboard 
+# import WeekOverWeek ------
+WeekOverWeek <- readr::read_rds("data/processed/2020-04-21-WeekOverWeek.rds")
+# remove missing
+WeekOverWeek <- WeekOverWeek %>% tidyr::drop_na()
+# import GroupedCanData ------
+GroupedCanData <- readr::read_rds("data/processed/2020-04-21-Top100BrandCatsData.rds")
+# import Top25Data ----
+Top25Data <- readr::read_rds("data/processed/2020-04-21-Top25Data.rds")
+# import Top50Data ----
+
+```
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+This is a sample sales dashboard for cannabis products. Select a quarter below to view the sales across a three-month period. 
+
+```{r selector-quarter}
+shiny::selectInput(inputId = "quarterNum", 
+                   label = h3("Fiscal Quarter"), 
+    choices = list("Q1" = 1, "Q2" = 2, "Q3" = 3, "Q4" = 4), 
+    selected = 3)
+```
+
+These data come from the UK e-commerce dataset from the [UCI Machine Learning Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail) and the [kushy cannabis data set](https://github.com/kushyapp/cannabis-dataset). 
+
+This dashboard was built using [`flexdashboard`](https://rmarkdown.rstudio.com/flexdashboard/). The graphics are built using [`ggplot2`](https://ggplot2.tidyverse.org/), [`plotly`](https://github.com/ropensci/plotly#readme), and [`highcharter`](http://jkunst.com/highcharter/).
+
+Please contact `mjfrigaard@gmail.com` for more information.
+
+Column {data-width=600}
+-----------------------------------------------------------------------
+
+### Quantity sold per week
+
+This graph displays the overall quantity sold per week. 
+
+```{r quantity-sold-per-week, eval=TRUE}
+# # set theme for wow ----
+ggplot2::theme_set(hrbrthemes::theme_ipsum_rc(
+  base_family = "Ubuntu",
+  base_size = 9,
+  strip_text_size = 11,
+  axis_title_size = 9,
+  plot_title_size = 15,
+  subtitle_size = 13
+))
+
+# create reactive for quarter ----
+WowReact <- reactive({
+  # rename this reactive to generic data
+        data <- WeekOverWeek %>%
+          # remove missing
+          tidyr::drop_na()
+          # return data
+          data
+        
+    })
+
+# create labs for Quantity Per Week ----
+labs_quantity_per_week <- ggplot2::labs(
+         x = "Week", 
+         y = "Quantity Sold",
+         title = "Quantity Per Week") 
+
+# render plot with reactive -----
+plotly::renderPlotly({
+  
+   data <- WowReact()
+   
+    gg_qpw <- ggplot2::ggplot(data = data, 
+                  # put week_year on the x
+               aes(x = week_year, 
+                   # and week quantity on the y
+                   y = week_qty)) + 
+      # add the line plot
+        ggplot2::geom_line() +
+      # add the smooth (predictor)
+        ggplot2::geom_smooth() +
+      # add points
+        ggplot2::geom_point() +
+      # add labels
+        labs_quantity_per_week
+    
+    plotly::toWebGL(plotly::ggplotly(gg_qpw))
+})
+```
+
+
+### Week over week sales 
+
+These are the sales by quarter and month. Select the quarter in the sidebar.   
+
+```{r wow-plot}
+# labels Week Over Week Annual Sales ----
+labs_wow_annual_sales <- ggplot2::labs(
+  y = 'Sales', 
+  x = ' ', 
+  title = 'Week Over Week Annual Sales',
+  subtitle = "Quarter 3 Simulated Cannabis Sales Data",
+  caption = "Graphic and analysis by PDG") 
+
+# create reactive (QDataReact) for quarter data ----
+QDataReact <- reactive({
+  # rename this reactive to generic data
+          # filter this to the selected option from the side-panel
+         data <- dplyr::filter(WeekOverWeek, 
+                      # set numerical category for numerical quarter variable
+                        quar == as.numeric(input$quarterNum))
+         
+         data
+    })
+
+# create session data
+cdata <- session$clientData
+
+
+# render plot with reactive -----
+plotly::renderPlotly({
+  
+   data <- QDataReact()
+   
+   gg_wow_sales <- data %>% 
+  
+  # this will put week_year on the x
+    ggplot2::ggplot(aes(x = week_year, 
+                        # and the week over week quantity on the y
+                        y = wow_quantity,
+                        # group by month
+                        color = month)) +
+  # add the line plot
+    ggplot2::geom_line(aes(color = month), 
+                           show.legend = FALSE) +
+  # and the point
+    ggplot2::geom_point(aes(color = month), 
+                           show.legend = FALSE) +
+  # the axis title here will inherit the size and color
+    ggplot2::theme(axis.title = element_text(face = c("bold"))) +
+  # this will remove the legend
+    ggplot2::theme(legend.title = element_blank()) +
+  # this adds the percent on the y axis
+    ggplot2::scale_y_continuous(labels = 
+                                  scales::percent_format(accuracy = 1)) +
+  # # here we facet by the month
+    ggplot2::facet_wrap(. ~ month,
+                        #
+                        scales = "free") +
+    ggplot2::theme(axis.text.x = 
+                     element_text(angle = 45, 
+                                  hjust = 0.5, 
+                                  vjust = 0.5)) +
+           # add theme
+    ggthemes::theme_hc(base_size = 10, 
+                                   base_family = "Ubuntu") +
+     # add colors 
+     ggplot2::scale_color_brewer(palette = "YlGn") +
+    
+  labs_wow_annual_sales
+   # convert to plotly object
+  plotly::toWebGL(
+    plotly::ggplotly(p = gg_wow_sales, 
+                     
+                   width = cdata$output_pid_width, 
+                   
+                   height = cdata$output_pid_height)
+    )
+  
+})
+```
+
+
+Column {.tabset data-width=400}
+-----------------------------------------------------------------------
+
+### Sales by Category
+
+```{r treemap}
+# treemap --------
+highcharter::hctreemap2(data = GroupedCanData, 
+                        
+              group_vars = c("brand_category"),
+              
+              size_var = "sales_by_cat", 
+              
+              color_var = "sales_by_cat",
+              
+              layoutAlgorithm = "squarified",
+              
+              levelIsConstant = FALSE,
+              
+              allowDrillToNode = TRUE) %>% 
+  
+  # add the RColorBrewer greens 
+  
+    hc_colorAxis(minColor = RColorBrewer::brewer.pal(7, "Greens")[1],
+                 
+                 maxColor = RColorBrewer::brewer.pal(7, "Greens")[7]) 
+
+```
+
+### Best Sellers
+
+```{r geom-col-top-25-brands}
+# define labels ----
+top_25_labs <- ggplot2::labs(x = "Brands",
+                             
+                  y = "Count",
+                  
+                  title = "Top 25 Cannabis Brands & Categories") 
+
+# create session data
+cdata <- session$clientData
+  
+# create Top25React reactive ----
+
+Top25React <- reactive({
+  
+  # rename this reactive to generic data
+  
+        data <- Top25Data
+        
+          data
+        
+})
+
+# render plot with reactive -----
+shiny::renderPlot({
+  
+  data <- Top25React()
+  
+    data %>% 
+      
+    ggplot2::ggplot(aes(x = brand, 
+                      
+                      y = brand_cat_count, 
+                      
+                      group = brand_category)) +
+      
+    ggplot2::geom_col(aes(fill = brand),
+                      width = 0.60, 
+                      show.legend = FALSE) +
+      
+    ggplot2::coord_flip() +
+      
+    ggplot2::facet_wrap(. ~ brand_category, 
+                        
+               scales = "free") + 
+      
+    ggplot2::theme_minimal(base_size = 10, 
+                               
+                               base_family = "Ubuntu") +
+      
+    top_25_labs -> gg_top_25
+    
+    # keep as ggplot2 object
+    gg_top_25
+    
+    # convert to plotly object
+    # plotly::toWebGL(
+    #   
+    #   plotly::ggplotly(p = gg_top_25, 
+    #                    
+    #                  width = cdata$output_pid_width, 
+    #                  
+    #                  height = cdata$output_pid_height)
+    #   
+    # )
+    
+})
+```

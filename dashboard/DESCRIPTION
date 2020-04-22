@@ -1,8 +1,8 @@
-Version: 1.0
+Version: 0.0.3
 Type: Shiny
-Title: Streaming CRAN data example
-Author: Joe Cheng
-AuthorUrl: http://www.rstudio.com/
+Title: CanDash
+Author: Martin Frigaard
+AuthorUrl: https://www.martinfrigaard.io/
 License: MIT
 Tags: streaming
 DisplayMode: Normal
