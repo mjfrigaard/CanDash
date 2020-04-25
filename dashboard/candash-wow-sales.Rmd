@@ -94,9 +94,9 @@ This graph displays the overall quantity sold per week (with a 'best fit' line a
 
 Percentage increase in sales by quarter and month
 
-***Median Monthly Order Amount by Location***
+***Median Order Amount by Location***
 
-Median order amount per month in each State/Region
+Median order amount per week in each State/Region
 
 ***Daily Sales by Category***
 
@@ -256,8 +256,8 @@ plotly::renderPlotly({
 # labels
 labs_median_order_value <- ggplot2::labs(
                   y = 'Median Order Amount', 
-                  x = 'Month',
-                  title = 'Median Monthly Order Amount by Location')
+                  x = ' ',
+                  title = 'Median Order Amount by Location')
 
 # create reactive (MonLocSalesReac) for Location data ----
 MonLocSalesReac <- reactive({
