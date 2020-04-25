@@ -1,10 +1,10 @@
 ---
-title: "CanDash (a minimal cannabis dashboard) v0.0.4"
+title: "CanDash (v0.0.4)"
 author: "Martin Frigaard"
 output: 
   flexdashboard::flex_dashboard:
     navbar:
-      - { title: "Author", href: "https://martinfrigaard.io/" }
+      - { title: "Contact", href: "https://martinfrigaard.io/" }
     orientation: rows
     social: menu
     css: style.css
@@ -23,36 +23,50 @@ library(viridisLite)
 library(treemap)
 library(RColorBrewer)
 library(ggthemes)
+library(magrittr)
 # fs::dir_ls("data/processed/", 
 #            regex = "-MonthlyLocationSales")
 # import MonthlyLocationSales ------
-MonthlyLocationSales <- readr::read_rds("data/processed/2020-04-25-MonthlyLocationSales.rds")
+MonthlyLocationSales <- read_rds("data/processed/2020-04-25-MonthlyLocationSales.rds")
 # import BrandCatTop10 ------
-BrandCatTop10 <- readr::read_rds("data/processed/2020-04-24-BrandCatTop10.rds")
+BrandCatTop10 <- read_rds("data/processed/2020-04-25-BrandCatTop10.rds")
 # import Top10Brands ------
-Top10Brands <- readr::read_rds("data/processed/2020-04-24-Top10Brands.rds")
+Top10Brands <- read_rds("data/processed/2020-04-25-Top10Brands.rds")
 # load the data into the dashboard 
 # import WeekOverWeek ------
-WeekOverWeek <- readr::read_rds("data/processed/2020-04-21-WeekOverWeek.rds")
-# remove missing
-WeekOverWeek <- WeekOverWeek %>% tidyr::drop_na()
+WeekOverWeek <- readr::read_rds("data/processed/2020-04-25-WeekOverWeek.rds")
+WeekOverWeek <- WeekOverWeek %>% 
+  # make sure this is all positive!
+  dplyr::mutate(week_qty = abs(week_qty)) %>%
+  # remove missing
+  tidyr::drop_na()
 # import GroupedCanData ------
-GroupedCanData <- readr::read_rds("data/processed/2020-04-21-Top100BrandCatsData.rds")
+GroupedCanData <- read_rds("data/processed/2020-04-25-Top100BrandCatsData.rds")
 # import Top25Data ----
-Top25Data <- readr::read_rds("data/processed/2020-04-21-Top25Data.rds")
+Top25Data <- read_rds("data/processed/2020-04-25-Top25Data.rds")
 ```
 
 Column {.sidebar}
 -----------------------------------------------------------------------
 
-This is a sample sales dashboard for cannabis products. Select a quarter below to view the sales across a three-month period. 
+This is a sample sales dashboard for cannabis products. 
+
+**The Data**
+
+These data have been simulated from the UK e-commerce dataset from the [UCI Machine Learning Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail) and the [Kushy cannabis data sets](https://github.com/kushyapp/cannabis-dataset). 
+
+Select a quarter below to view the sales across a three-month period
 
 ```{r selector-quarter}
 shiny::selectInput(inputId = "quarterNum", 
                    label = h3("Fiscal Quarter"), 
     choices = list("Q1" = 1, "Q2" = 2, "Q3" = 3, "Q4" = 4), 
     selected = 3)
+```
 
+Select a region to view track the median purchase order amount by location
+
+```{r selector-location}
 shiny::selectInput(inputId = "locationNum", 
                    label = h3("Sales Region"), 
                    choices = list("West/Pacific" = 1, 
@@ -60,21 +74,41 @@ shiny::selectInput(inputId = "locationNum",
                    selected = 1)
 ```
 
-These data come from the UK e-commerce dataset from the [UCI Machine Learning Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail) and the [kushy cannabis data set](https://github.com/kushyapp/cannabis-dataset). 
 
-This dashboard was built using [`flexdashboard`](https://rmarkdown.rstudio.com/flexdashboard/). The graphics are built using [`ggplot2`](https://ggplot2.tidyverse.org/), [`plotly`](https://github.com/ropensci/plotly#readme), and [`highcharter`](http://jkunst.com/highcharter/).
 
-**Quantity sold per week**
+**The Dashboard**
 
-This graph displays the overall quantity sold per week.
+This dashboard was built using [`flexdashboard`](https://rmarkdown.rstudio.com/flexdashboard/), interactive dashboards written in [Rmarkdown](https://rmarkdown.rstudio.com/) and [Shiny](https://shiny.rstudio.com/).
 
-**Week over week sales**
+**The Graphics**
 
-These are the sales by quarter and month. Select the quarter in the sidebar. 
+The line graphs were built using [`ggplot2`](https://ggplot2.tidyverse.org/) and [`plotly`](https://github.com/ropensci/plotly#readme), with theme components from [`hrbrthemes`](https://hrbrmstr.github.io/hrbrthemes/). Zoom in on particular with click and drag (read more [here](https://plotly.com/chart-studio-help/zoom-pan-hover-controls/)).
 
-**Contact**
+The `treemap` was built with [`highcharter`](http://jkunst.com/highcharter/).
 
-Please contact `mjfrigaard@gmail.com` for more information.
+***Quantity sold per week***
+
+This graph displays the overall quantity sold per week (with a 'best fit' line and shaded confidence interval)
+
+***Week over week sales***
+
+Percentage increase in sales by quarter and month
+
+***Median Monthly Order Amount by Location***
+
+Median order amount per month in each State/Region
+
+***Daily Sales by Category***
+
+This [treemap](https://en.wikipedia.org/wiki/Treemapping) displays the largest selling cannabis categories per day
+
+***Best Selling Brand Categories***
+
+A column chart for the best performing categories per month
+
+***Best Selling Brands***
+
+A column chart for the best performing brands per month
 
 <!--{data-width=600}--> 
 
@@ -216,74 +250,71 @@ plotly::renderPlotly({
 })
 ```
 
-<!-- ### Total Monthly Sales by Location -->
+### Median Order Amount By Location 
 
-<!-- ```{r ggTop100MonthlyLocationSales} -->
-<!-- # labels -->
-<!-- labs_monthly_location_sales <- ggplot2::labs(y = 'Total Monthly Sales', -->
-<!--                   x = ' ', -->
-<!--                   title = 'Total Monthly Sales By Region & Location') -->
+```{r ggTop100MonthlyLocationSales}
+# labels
+labs_median_order_value <- ggplot2::labs(
+                  y = 'Median Order Amount', 
+                  x = 'Month',
+                  title = 'Median Monthly Order Amount by Location')
 
-<!-- # create reactive (MonLocSalesReac) for Location data ---- -->
-<!-- MonLocSalesReac <- reactive({ -->
-<!--   # rename this reactive to generic data -->
-<!--          data <- dplyr::filter(MonthlyLocationSales, -->
-<!--                       # set numerical category for numerical sales region -->
-<!--                         sales_reg_num == as.numeric(input$locationNum)) -->
-<!--          data -->
-<!--     }) -->
-
-
-<!-- # render plot with reactive ----- -->
-<!-- plotly::renderPlotly({ -->
-
-<!--     MonLocSalesReac() %>% -->
-<!--     # sort these by total_monthly_sales -->
-<!--     dplyr::arrange(desc(total_monthly_sales)) %>% -->
-<!--     # plot this as floor_month vs. monthly sales -->
-<!--     ggplot2::ggplot(data = ., -->
-<!--                     # month -->
-<!--                     aes(x = floor_month, -->
-<!--                         # total monthly sales here -->
-<!--                         y = total_monthly_sales)) + -->
-<!--     # add a line -->
-<!--     ggplot2::geom_line(aes(color = location), show.legend = FALSE) + -->
-<!--     # and a point -->
-<!--     ggplot2::geom_point(aes(color = location), show.legend = FALSE) + -->
-<!--     # and a theme -->
-<!--     ggplot2::theme(axis.title = -->
-<!--                      element_text()) + -->
-<!--     # with legend title -->
-<!--     ggplot2::theme(legend.title = -->
-<!--                      element_blank()) + -->
-<!--     # and the scales for dollar formats -->
-<!--     ggplot2::scale_y_continuous(labels = -->
-<!--                                   scales::dollar_format(accuracy = 1)) + -->
-<!--     # facet by the sales_region -->
-<!--     ggplot2::facet_wrap(location ~ sales_region, -->
-<!--                         scales = "free_x") + -->
-<!--     # adjust the x axis text -->
-<!--     ggplot2::theme(axis.text.x = -->
-<!--                      element_text(angle = 45, -->
-<!--                                   hjust = 0.5, -->
-<!--                                   vjust = 0.5)) + -->
-<!--     # add labs -->
-<!--     labs_monthly_location_sales -> ggTop100MonthlyLocationSales -->
+# create reactive (MonLocSalesReac) for Location data ----
+MonLocSalesReac <- reactive({
+  # rename this reactive to generic data
+         data <- dplyr::filter(MonthlyLocationSales,
+                      # set numerical category for numerical sales region
+                        sales_reg_num == as.numeric(input$locationNum))
+         data
+    })
 
 
-<!-- # convert to plotly -->
-<!-- plotly::hide_legend( -->
-<!--   plotly::toWebGL( -->
-<!--     plotly::ggplotly(ggTop100MonthlyLocationSales))) -->
-<!-- }) -->
-<!-- ``` -->
+# render plot with reactive -----
+plotly::renderPlotly({
+
+    MonLocSalesReac() %>%
+    # sort these by total_monthly_sales
+    dplyr::arrange(desc(median_monthly_sales)) %>% 
+    # plot this as floor_month vs. monthly sales
+    ggplot2::ggplot(data = ., 
+                    # put months on the x 
+           mapping = aes(x = floor_month, 
+                         # median monthly sales
+                         y = median_monthly_sales)) +
+    # add the line
+    ggplot2::geom_line() +
+    # add the point
+    ggplot2::geom_point() +
+    # add the y format
+    ggplot2::scale_y_continuous(labels = 
+                                    scales::dollar_format(accuracy = 1)) +
+  
+    # facet this by the location and set scales to free
+    ggplot2::facet_wrap(sales_region ~ location, 
+                        scales = "free_x") + 
+  
+      # adjust the x axis text
+    ggplot2::theme(axis.text.x = 
+                     element_text(angle = 45, 
+                                  hjust = 0.5, 
+                                  vjust = 0.5)) +
+  # add the labels
+  labs_median_order_value -> ggMedianOrderValue
+
+
+# convert to plotly
+plotly::hide_legend(
+  plotly::toWebGL(
+    plotly::ggplotly(ggMedianOrderValue)))
+})
+```
 
 
 
 Row {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
-### Sales by Category
+### Daily Sales by Category
 
 ```{r treemap}
 # treemap --------
@@ -309,15 +340,15 @@ highcharter::hctreemap2(data = GroupedCanData,
 
 ```
 
-### Best Selling Brand Categories
+### Best Selling Categories
 
 ```{r geom-col-top-10-brand-categories}
 # define labels ----
-top_10brand_cat_labs <- ggplot2::labs(x = "Brands",
+top_10brand_cat_labs <- ggplot2::labs(x = " ",
                              
-                  y = "Count",
+                  y = "Count (Per Month)",
                   
-                  title = "Top 10 Cannabis Brands Categories") 
+                  title = "Top 10 Cannabis Categories") 
 
 # create session data
 cdata <- session$clientData
@@ -368,9 +399,9 @@ plotly::renderPlotly({
 
 ```{r geom-col-top-10-brands}
 # define labels ----
-top_10brand_labs <- ggplot2::labs(x = "Brands",
+top_10brand_labs <- ggplot2::labs(x = " ",
                              
-                  y = "Count",
+                  y = "Count (Per Month)",
                   
                   title = "Top 10 Cannabis Brands") 
 

@@ -578,6 +578,15 @@ WeekOverWeek %>%
 
 Now we're wondering what the quantity sold per week is, and we can get this with `week_year` and `week_qty`.
 
+```{r abs-week_qty}
+WeekOverWeek <- WeekOverWeek %>% 
+  # make sure this is all positive!
+  dplyr::mutate(week_qty = abs(week_qty)) %>%
+  # remove missing
+  tidyr::drop_na()
+```
+
+
 ```{r ggWowQuantity}
 labs_quantity_per_week <- ggplot2::labs(
          x = "Week", 
@@ -676,22 +685,6 @@ MonthlyLocationSales %>%
   spread(sales_region, n)
 ```
 
-```{r export-MonthlyLocationSales}
-# export MonthlyLocationSales -----
-readr::write_rds(x = MonthlyLocationSales, 
-          path = paste0("data/processed/", 
-                        base::noquote(lubridate::today()),
-                        "-MonthlyLocationSales.rds"))
-# export MonthlyLocationSales -----
-readr::write_csv(as.data.frame(MonthlyLocationSales), 
-          path = paste0("data/processed/", 
-                        base::noquote(lubridate::today()),
-                        "-MonthlyLocationSales.csv"))
-
-fs::dir_ls("data/processed/", 
-           regexp = "-MonthlyLocationSales")
-```
-
 This gives us a grouped `data.frame` with 138 rows.  
 
 ## Total Monthly Sales by Region/Location
@@ -749,20 +742,23 @@ plotly::hide_legend(
 
 Faceting by region and coloring by region while having months on the x axis is helpful for spotting trends. Graphs like this can help us spot gaps in total sales by location (i.e. California vs. Manitoba).
 
-## Median Order Sales by Location 
+## Median Order Amount By Location 
 
 This is the median sales by `floor_month`, sorted by the `median_sales`. 
 
 ```{r ggMedianOrderValue, message=FALSE, warning=FALSE}
 # labels
 labs_median_order_value <- ggplot2::labs(
-                  y = 'Median Monthly Sales', 
+                  y = 'Median Order Amount', 
                   x = 'Floor Month',
-                  title = 'Median Monthly Sales by Location')
+                  title = 'Median Monthly Order Amount by Location')
 # plot
 ggMedianOrderValue <- MonthlyLocationSales %>%
     # sort these by median_sales
     dplyr::arrange(desc(median_monthly_sales)) %>% 
+
+    # plot this as sales_reg_num is Western/Mountain
+    dplyr::filter(sales_reg_num == 1) %>% 
     # plot
     ggplot2::ggplot(data = ., 
                     # put months on the x 
@@ -778,8 +774,8 @@ ggMedianOrderValue <- MonthlyLocationSales %>%
                                     scales::dollar_format(accuracy = 1)) +
   
     # facet this by the location and set scales to free
-    ggplot2::facet_wrap(. ~ location, 
-                        scales = "free") + 
+    ggplot2::facet_wrap(sales_region ~ location, 
+                        scales = "free_x") + 
   
       # adjust the x axis text
     ggplot2::theme(axis.text.x = 
@@ -790,15 +786,31 @@ ggMedianOrderValue <- MonthlyLocationSales %>%
   labs_median_order_value
 
 ggMedianOrderValue
+
 ```
 
 ## Export 
 
 Time-stamp and export.
 
+
+```{r export-MonthlyLocationSales}
+# export MonthlyLocationSales -----
+readr::write_rds(x = MonthlyLocationSales, 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-MonthlyLocationSales.rds"))
+# export MonthlyLocationSales -----
+readr::write_csv(as.data.frame(MonthlyLocationSales), 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-MonthlyLocationSales.csv"))
+
+fs::dir_ls("data/processed/", 
+           regexp = "-MonthlyLocationSales")
+```
+
 ```{r export}
 fs::dir_tree("data/processed/", 
-             regex = "2020-04-21",
-             recurse = FALSE)
-
+             recurse = TRUE)
 ```

@@ -619,6 +619,14 @@ Now we’re wondering what the quantity sold per week is, and we can get
 this with `week_year` and `week_qty`.
 
 ``` r
+WeekOverWeek <- WeekOverWeek %>% 
+  # make sure this is all positive!
+  dplyr::mutate(week_qty = abs(week_qty)) %>%
+  # remove missing
+  tidyr::drop_na()
+```
+
+``` r
 labs_quantity_per_week <- ggplot2::labs(
          x = "Week", 
          y = "Quantity Sold",
@@ -638,6 +646,7 @@ ggWowQuantity <- WeekOverWeek %>%
     ggplot2::geom_smooth() +
   # add points
     ggplot2::geom_point() +
+  # add labs
     labs_quantity_per_week
 
 # convert to plotly
@@ -674,12 +683,11 @@ MonthlyLocationSales <- CannabisData %>%
     dplyr::mutate(
             sales = quantity*unit_price, 
             location = case_when(
-              # California
-              location %in% "Salisbury Postcode Area (UK)" ~ "California",
               # Arizona
+              location %in% "Salisbury Postcode Area (UK)" ~ "Arizona",
               location %in% "Nova Scotia" ~ "Arizona",   
+              location %in% "British Columbia" ~ "Arizona",
               # Colorado
-              location %in% "British Columbia" ~ "Colorado",
               location %in% "Alberta" ~ "Colorado",
               # Oregon
               location %in% "Ontario" ~ "Oregon",        
@@ -723,25 +731,6 @@ MonthlyLocationSales %>%
     #>            <dbl>           <int>          <int>
     #>  1             1              NA             38
     #>  2             2              36             NA
-
-``` r
-# export MonthlyLocationSales -----
-readr::write_rds(x = MonthlyLocationSales, 
-          path = paste0("data/processed/", 
-                        base::noquote(lubridate::today()),
-                        "-MonthlyLocationSales.rds"))
-# export MonthlyLocationSales -----
-readr::write_csv(as.data.frame(MonthlyLocationSales), 
-          path = paste0("data/processed/", 
-                        base::noquote(lubridate::today()),
-                        "-MonthlyLocationSales.csv"))
-
-fs::dir_ls("data/processed/", 
-           regexp = "-MonthlyLocationSales")
-```
-
-    #>  data/processed/2020-04-25-MonthlyLocationSales.csv
-    #>  data/processed/2020-04-25-MonthlyLocationSales.rds
 
 This gives us a grouped `data.frame` with 138 rows.
 
@@ -805,20 +794,23 @@ Faceting by region and coloring by region while having months on the x
 axis is helpful for spotting trends. Graphs like this can help us spot
 gaps in total sales by location (i.e. California vs. Manitoba).
 
-## Median Order Sales by Location
+## Median Order Amount By Location
 
 This is the median sales by `floor_month`, sorted by the `median_sales`.
 
 ``` r
 # labels
 labs_median_order_value <- ggplot2::labs(
-                  y = 'Median Monthly Sales', 
+                  y = 'Median Order Amount', 
                   x = 'Floor Month',
-                  title = 'Median Monthly Sales by Location')
+                  title = 'Median Monthly Order Amount by Location')
 # plot
 ggMedianOrderValue <- MonthlyLocationSales %>%
     # sort these by median_sales
     dplyr::arrange(desc(median_monthly_sales)) %>% 
+
+    # plot this as sales_reg_num is Western/Mountain
+    dplyr::filter(sales_reg_num == 1) %>% 
     # plot
     ggplot2::ggplot(data = ., 
                     # put months on the x 
@@ -834,8 +826,8 @@ ggMedianOrderValue <- MonthlyLocationSales %>%
                                     scales::dollar_format(accuracy = 1)) +
   
     # facet this by the location and set scales to free
-    ggplot2::facet_wrap(. ~ location, 
-                        scales = "free") + 
+    ggplot2::facet_wrap(sales_region ~ location, 
+                        scales = "free_x") + 
   
       # adjust the x axis text
     ggplot2::theme(axis.text.x = 
@@ -855,10 +847,64 @@ ggMedianOrderValue
 Time-stamp and export.
 
 ``` r
+# export MonthlyLocationSales -----
+readr::write_rds(x = MonthlyLocationSales, 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-MonthlyLocationSales.rds"))
+# export MonthlyLocationSales -----
+readr::write_csv(as.data.frame(MonthlyLocationSales), 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-MonthlyLocationSales.csv"))
+
+fs::dir_ls("data/processed/", 
+           regexp = "-MonthlyLocationSales")
+```
+
+    #>  data/processed/2020-04-25-MonthlyLocationSales.csv
+    #>  data/processed/2020-04-25-MonthlyLocationSales.rds
+
+``` r
 fs::dir_tree("data/processed/", 
-             regex = "2020-04-21",
-             recurse = FALSE)
+             recurse = TRUE)
 ```
 
     #>  data/processed/
-    #>  └── 2020-04-21
+    #>  ├── 2020-04-21
+    #>  │   ├── 2020-04-21-MonthlyLocationSales.csv
+    #>  │   ├── 2020-04-21-MonthlyLocationSales.rds
+    #>  │   ├── 2020-04-21-Top100BrandCatsData.csv
+    #>  │   ├── 2020-04-21-Top100BrandCatsData.rds
+    #>  │   ├── 2020-04-21-Top25Data.csv
+    #>  │   ├── 2020-04-21-Top25Data.rds
+    #>  │   ├── 2020-04-21-Top50Data.csv
+    #>  │   ├── 2020-04-21-Top50Data.rds
+    #>  │   ├── 2020-04-21-WeekOverWeek.csv
+    #>  │   └── 2020-04-21-WeekOverWeek.rds
+    #>  ├── 2020-04-24
+    #>  │   ├── 2020-04-24-BrandCatTop10.csv
+    #>  │   ├── 2020-04-24-BrandCatTop10.rds
+    #>  │   ├── 2020-04-24-CannabisWowData.csv
+    #>  │   ├── 2020-04-24-CannabisWowData.rds
+    #>  │   ├── 2020-04-24-Top10Brands.csv
+    #>  │   └── 2020-04-24-Top10Brands.rds
+    #>  ├── 2020-04-25
+    #>  │   ├── 2020-04-25-BrandCatTop10.csv
+    #>  │   ├── 2020-04-25-MonthlyLocationSales.csv
+    #>  │   ├── 2020-04-25-Top100BrandCatsData.csv
+    #>  │   ├── 2020-04-25-Top10Brands.csv
+    #>  │   ├── 2020-04-25-Top25Data.csv
+    #>  │   └── 2020-04-25-WeekOverWeek.csv
+    #>  ├── 2020-04-25-BrandCatTop10.csv
+    #>  ├── 2020-04-25-BrandCatTop10.rds
+    #>  ├── 2020-04-25-MonthlyLocationSales.csv
+    #>  ├── 2020-04-25-MonthlyLocationSales.rds
+    #>  ├── 2020-04-25-Top100BrandCatsData.csv
+    #>  ├── 2020-04-25-Top100BrandCatsData.rds
+    #>  ├── 2020-04-25-Top10Brands.csv
+    #>  ├── 2020-04-25-Top10Brands.rds
+    #>  ├── 2020-04-25-Top25Data.csv
+    #>  ├── 2020-04-25-Top25Data.rds
+    #>  ├── 2020-04-25-WeekOverWeek.csv
+    #>  └── 2020-04-25-WeekOverWeek.rds
