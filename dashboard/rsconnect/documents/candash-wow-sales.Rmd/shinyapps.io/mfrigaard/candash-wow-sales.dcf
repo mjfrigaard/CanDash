@@ -1,0 +1,13 @@
+name: candash-wow-sales
+title: candash-wow-sales
+username:
+account: mfrigaard
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2182072
+bundleId: 3062735
+url: https://mfrigaard.shinyapps.io/candash-wow-sales/
+when: 1587796677.89748
+asMultiple: TRUE
+asStatic: FALSE
+ignoredFiles: figs/front-cover.png|README.Rmd

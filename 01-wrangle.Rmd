@@ -27,7 +27,7 @@ base::options(
 )
 # knitr chunk options ----
 knitr::opts_chunk$set(
-  echo = TRUE, # show/hide all code
+  echo = FALSE, # show/hide all code
   # results = "hide", # hide results
   tidy = FALSE, # cleaner code printing
   comment = "#> ", # better console printing
@@ -49,7 +49,7 @@ knitr::opts_knit$set(
 
 This script outlines the steps to wrangle the Cannabis data. We used an open online retail data set from the [UCI Machine Learning Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail) for the week-over-week visualizations (`OnlineRetail`), and combined this with categories from the [`kushyapp`](https://github.com/kushyapp/cannabis-dataset).
 
-## Import data 
+## Import the data 
 
 All of the data are in the `data/` folder. 
 
@@ -76,8 +76,8 @@ OnlineRetail %>% dplyr::glimpse()
 This is huge, so we will take a 10% sample. 
 
 ```{r SmOnlineRetail}
-SmOnlineRetail <- sample_frac(tbl = OnlineRetail, size = 1/10)
-SmOnlineRetail %>% glimpse(78)
+SmOnlineRetail <- dplyr::sample_frac(tbl = OnlineRetail, size = 1/10)
+SmOnlineRetail %>% dplyr::glimpse(78)
 ```
 
 This is much easier to deal with.
@@ -89,15 +89,22 @@ The goal here is to simulate some cannabis data by combining the `SmOnlineRetail
 ```{r wrangle}
 SmOnlineRetail <- SmOnlineRetail %>% 
     dplyr::mutate(
+                # create invoice date
                 invoice_date = as.Date(invoice_date, "%m/%d/%y"),
-                dow = lubridate::day(invoice_date), # day of the week 
-                week = lubridate::week(invoice_date), # week of the year
-                yr = lubridate::year(invoice_date), # year 
+                # day of week
+                dow = lubridate::day(invoice_date), 
+                # week of the year
+                week = lubridate::week(invoice_date),
+                # year 
+                yr = lubridate::year(invoice_date), 
+                # week_year (with floor_date)
                 week_year = lubridate::floor_date(invoice_date, 
                                                   unit = "week"),
+                # create month
                 month = lubridate::month(week_year, 
                                          abbr = TRUE, 
                                          label = TRUE),
+                # floor_month
                 floor_month = lubridate::floor_date(week_year, 
                                                     unit = "month"))
 ```
@@ -137,7 +144,7 @@ AmntPerInvoice <- SmOnlineRetail %>%
                 amnt_per_invoice,
                 dplyr::everything(),
                 -c(country))
-AmntPerInvoice %>% head()
+AmntPerInvoice %>% head(10)
 ```
 
 We can check the calculations by taking a quick case (invoice `548920`). 
@@ -227,9 +234,11 @@ We've just changed the number of rows in this data frame from `1778` to `1988` b
 
 ```{r recount-names}
 TidyBrandCat %>% 
-  dplyr::count(brand_name, sort = TRUE) 
+  dplyr::count(brand_name, sort = TRUE) %>% 
+  utils::head(10)
 KushyBrands %>% 
-  dplyr::count(name, sort = TRUE)
+  dplyr::count(name, sort = TRUE) %>% 
+  utils::head(10)
 ```
 
 These are the counts for each name (products and brands), and we can see there are fewer names in the `TidyBrandCat` data frame than the `KushyBrands` data frame. 
@@ -260,14 +269,16 @@ When we check the top categories in the brands table, we see there are mostly `C
 
 ```{r glimpse-TidyBrands}
 TidyBrandCat %>% 
-  dplyr::count(category, sort = TRUE)
+  dplyr::count(category, sort = TRUE) %>% 
+  utils::head(10)
 ```
 
 We will still want to use the `location` to replace the `country` variable in the online retail data.  
 
 ```{r count-location}
 TidyBrandCat %>% 
-  dplyr::count(location, sort = TRUE)
+  dplyr::count(location, sort = TRUE) %>% 
+  utils::head(10)
 ```
 
 We will make this a little cleaner for the graphs. 
@@ -322,8 +333,7 @@ Now we can see the vast majority of these are from California. We will look to j
 The kushy products are stored in the `KushyProducts` data frame. These might be a better candidate for binding to the online retail data. 
 
 ```{r KushyProducts}
-KushyProducts %>% 
-  skimr::skim()
+KushyProducts %>% skimr::skim()
 ```
 
 We will check the count of `name`s first. 
@@ -334,7 +344,8 @@ The `name` for each product is below.
 
 ```{r name-product}
 KushyProducts %>% 
-  dplyr::count(name, sort = TRUE)
+  dplyr::count(name, sort = TRUE) %>% 
+  utils::head(10)
 ```
 
 I am going to separate these terms by the hyphen ` -` and create a `product_name` variable and `product_details` variable. These two can be used to clean up the products into categories and their names.
@@ -366,7 +377,7 @@ This is similar to the categories above.
 
 ```{r product-categories}
 KushyProducts %>% 
-  count(category)
+  dplyr::count(category, sort = TRUE)
 ```
 
 We need to clean the categories just like we did in the brands data frame. 
@@ -385,7 +396,8 @@ TidyProdCat <- KushyProducts %>%
                 product_details, 
                 product_category = category,
                 dplyr::everything()) 
-TidyProdCat %>% dplyr::glimpse(78)
+TidyProdCat %>% 
+  utils::head(10)
 ```
 
 We can check these the same way we did with the brand categories, by selecting a case. We will use the `"Casey Jones - Crumble"` case to see if the `category` has been separated. 
@@ -420,15 +432,16 @@ This appears similar to the `brand` variable, but it lists many more levels.
 
 ```{r top-ten-brands-in-products}
 TidyProdCat %>% 
-  count(brand, sort = TRUE) %>% 
-  head(10)
+  dplyr::count(brand, sort = TRUE) %>% 
+  utils::head(10)
 ```
 Let's filter out the `"Unknown Producer"`s and see what these looks like. 
 
 ```{r brand-product}
 TidyProdCat %>% 
   dplyr::filter(brand != "Unknown Producer") %>% 
-  dplyr::count(brand, sort = TRUE)
+  dplyr::count(brand, sort = TRUE) %>% 
+  utils::head(10)
 ```
 
 This shows there are around 1233 brands in the `TidyProdCat` data set. We'll look to bind this to the brands data set. 
@@ -543,10 +556,15 @@ Time-stamp and export.
 
 ```{r export}
 # export these with a time stamp
-write_csv(as.data.frame(CannabisWowData), 
-          path = paste0("data/processed/", 
-                        base::noquote(lubridate::today()),
-                        "-CannabisWowData.csv"))
+readr::write_csv(base::as.data.frame(CannabisWowData), 
+                    path = paste0("data/processed/", 
+                              base::noquote(lubridate::today()),
+                                            "-CannabisWowData.csv"))
+
+readr::write_rds(x = CannabisWowData, 
+                 path = paste0("data/processed/", 
+                              base::noquote(lubridate::today()),
+                                            "-CannabisWowData.rds"))
 
 fs::dir_tree("data/processed/", recurse = FALSE)
 ```

@@ -21,7 +21,7 @@ library(vctrs)
 library(inspectdf)
 # chunks set options
 knitr::opts_chunk$set(
-  echo = TRUE, # show/hide all code
+  echo = FALSE, # show/hide all code
   # results = "hide", # hide results
   tidy = FALSE, # cleaner code printing
   comment = "#> ", # better console printing
@@ -52,31 +52,33 @@ base::options(
 
 File/folder structure
 
-```{r , echo=FALSE}
+```{r dir-tree, echo=FALSE}
 fs::dir_tree(".", recurse = FALSE)
 ```
 
 ## The data
 
-The data model for the CanDash application had to be constructed from a few different sources. First, a list of products, brands, and other categorical data were imported form the Kushy application on Github. You can find the original data for this project [here](https://github.com/kushyapp/cannabis-dataset). 
+The data model for the `CanDash` application had to be constructed from a few different sources. First, a list of products, brands, and other categorical data were imported form the Kushy application on Github. You can find the original data for this project [here](https://github.com/kushyapp/cannabis-dataset). 
 
 We had to simulate the cost data for the products in the `Products` and `Brands` tables. We used the online retail data from the [UCI Machine Learning Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail).
 
-```{r data-objects}
+```{r data-objects, echo=FALSE}
 fs::dir_tree("data", recurse = TRUE)
 ```
 
 ## Import
 
-The data for the dashboard are imported below. 
+The data for the dashboard are imported below (We pick the latest version).
 
 ```{r import-CannabisWowData, message=FALSE, warning=FALSE}
 # fs::dir_tree("data/processed/")
-CannabisWowData <- read_csv("data/processed/2020-04-17-CannabisWowData.csv")
+CannabisWowData <- readr::read_csv("data/processed/2020-04-17-CannabisWowData.csv")
 CannabisWowData %>% dplyr::glimpse(78)
 ```
 
 ## Date ranges 
+
+Below we summarize the date ranges in this dataset.
 
 ```{r date-ranges}
 CannabisWowData %>% 
@@ -94,7 +96,9 @@ These data are missing from the final `CannabisWowData`.
 
 ```{r NAProducts}
 NAProducts <- inspectdf::inspect_na(df1 = CannabisWowData)
-NAProducts %>% inspectdf::show_plot(text_labels = TRUE) 
+NAProducts %>% 
+  inspectdf::show_plot(text_labels = TRUE) +
+  ggplot2::coord_flip()
 ```
 
 ## Categorical data 
@@ -105,10 +109,11 @@ These are the categorical variables in the `CannabisWowData`.
 CannabisWowCats <- CannabisWowData %>% 
   dplyr::select_if(is.character) %>% 
   inspectdf::inspect_cat()
-CannabisWowCats %>% inspectdf::show_plot(text_labels = TRUE) 
+CannabisWowCats %>% 
+  inspectdf::show_plot(text_labels = TRUE) 
 ```
 
-We can see the overwhelming number of the data are from `California`, in the months of `Nov/Oct`, etc.
+We can see the overwhelming number of the data are `Topicals` and `Concentrates` from `California`, in the months of `Nov/Oct`, etc.
 
 ## Numerical data 
 
@@ -129,6 +134,7 @@ CannabisWowNums %>%
 ```
 
 Here we can see the `amnt_per_invoice`, `prod_name_count`, `quantity`, and `unit_price` are skewed heavily towards 0. 
+
 
 
 

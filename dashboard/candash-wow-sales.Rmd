@@ -1,11 +1,11 @@
 ---
-title: "CanDash (a minimal cannabis dashboard)"
+title: "CanDash (a minimal cannabis dashboard) v0.0.4"
 author: "Martin Frigaard"
 output: 
   flexdashboard::flex_dashboard:
     navbar:
       - { title: "Author", href: "https://martinfrigaard.io/" }
-    orientation: columns
+    orientation: rows
     social: menu
     css: style.css
 runtime: shiny
@@ -23,7 +23,14 @@ library(viridisLite)
 library(treemap)
 library(RColorBrewer)
 library(ggthemes)
-# fs::dir_tree("data/processed/")
+# fs::dir_ls("data/processed/", 
+#            regex = "-MonthlyLocationSales")
+# import MonthlyLocationSales ------
+MonthlyLocationSales <- readr::read_rds("data/processed/2020-04-25-MonthlyLocationSales.rds")
+# import BrandCatTop10 ------
+BrandCatTop10 <- readr::read_rds("data/processed/2020-04-24-BrandCatTop10.rds")
+# import Top10Brands ------
+Top10Brands <- readr::read_rds("data/processed/2020-04-24-Top10Brands.rds")
 # load the data into the dashboard 
 # import WeekOverWeek ------
 WeekOverWeek <- readr::read_rds("data/processed/2020-04-21-WeekOverWeek.rds")
@@ -33,8 +40,6 @@ WeekOverWeek <- WeekOverWeek %>% tidyr::drop_na()
 GroupedCanData <- readr::read_rds("data/processed/2020-04-21-Top100BrandCatsData.rds")
 # import Top25Data ----
 Top25Data <- readr::read_rds("data/processed/2020-04-21-Top25Data.rds")
-# import Top50Data ----
-
 ```
 
 Column {.sidebar}
@@ -47,20 +52,36 @@ shiny::selectInput(inputId = "quarterNum",
                    label = h3("Fiscal Quarter"), 
     choices = list("Q1" = 1, "Q2" = 2, "Q3" = 3, "Q4" = 4), 
     selected = 3)
+
+shiny::selectInput(inputId = "locationNum", 
+                   label = h3("Sales Region"), 
+                   choices = list("West/Pacific" = 1, 
+                                  "West/Mountain" = 2), 
+                   selected = 1)
 ```
 
 These data come from the UK e-commerce dataset from the [UCI Machine Learning Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail) and the [kushy cannabis data set](https://github.com/kushyapp/cannabis-dataset). 
 
 This dashboard was built using [`flexdashboard`](https://rmarkdown.rstudio.com/flexdashboard/). The graphics are built using [`ggplot2`](https://ggplot2.tidyverse.org/), [`plotly`](https://github.com/ropensci/plotly#readme), and [`highcharter`](http://jkunst.com/highcharter/).
 
+**Quantity sold per week**
+
+This graph displays the overall quantity sold per week.
+
+**Week over week sales**
+
+These are the sales by quarter and month. Select the quarter in the sidebar. 
+
+**Contact**
+
 Please contact `mjfrigaard@gmail.com` for more information.
 
-Column {data-width=600}
------------------------------------------------------------------------
+<!--{data-width=600}--> 
+
+Row {.tabset .tabset-fade}
+-------------------------------------
 
 ### Quantity sold per week
-
-This graph displays the overall quantity sold per week. 
 
 ```{r quantity-sold-per-week, eval=TRUE}
 # # set theme for wow ----
@@ -116,8 +137,6 @@ plotly::renderPlotly({
 
 ### Week over week sales 
 
-These are the sales by quarter and month. Select the quarter in the sidebar.   
-
 ```{r wow-plot}
 # labels Week Over Week Annual Sales ----
 labs_wow_annual_sales <- ggplot2::labs(
@@ -154,12 +173,14 @@ plotly::renderPlotly({
                         # and the week over week quantity on the y
                         y = wow_quantity,
                         # group by month
-                        color = month)) +
+                        group = month)) +
   # add the line plot
-    ggplot2::geom_line(aes(color = month), 
-                           show.legend = FALSE) +
+    ggplot2::geom_line(color = "green4",
+                       alpha = 0.3,
+                       show.legend = FALSE) +
   # and the point
-    ggplot2::geom_point(aes(color = month), 
+    ggplot2::geom_point(color = "green4", 
+                        alpha = 0.7,
                            show.legend = FALSE) +
   # the axis title here will inherit the size and color
     ggplot2::theme(axis.title = element_text(face = c("bold"))) +
@@ -179,24 +200,87 @@ plotly::renderPlotly({
            # add theme
     ggthemes::theme_hc(base_size = 10, 
                                    base_family = "Ubuntu") +
-     # add colors 
-     ggplot2::scale_color_brewer(palette = "YlGn") +
     
   labs_wow_annual_sales
+   
    # convert to plotly object
-  plotly::toWebGL(
-    plotly::ggplotly(p = gg_wow_sales, 
-                     
-                   width = cdata$output_pid_width, 
-                   
-                   height = cdata$output_pid_height)
-    )
+    plotly::hide_legend(
+      plotly::toWebGL(
+        plotly::ggplotly(p = gg_wow_sales, 
+                         
+                       width = cdata$output_pid_width, 
+                       
+                       height = cdata$output_pid_height)
+        ))
   
 })
 ```
 
+<!-- ### Total Monthly Sales by Location -->
 
-Column {.tabset data-width=400}
+<!-- ```{r ggTop100MonthlyLocationSales} -->
+<!-- # labels -->
+<!-- labs_monthly_location_sales <- ggplot2::labs(y = 'Total Monthly Sales', -->
+<!--                   x = ' ', -->
+<!--                   title = 'Total Monthly Sales By Region & Location') -->
+
+<!-- # create reactive (MonLocSalesReac) for Location data ---- -->
+<!-- MonLocSalesReac <- reactive({ -->
+<!--   # rename this reactive to generic data -->
+<!--          data <- dplyr::filter(MonthlyLocationSales, -->
+<!--                       # set numerical category for numerical sales region -->
+<!--                         sales_reg_num == as.numeric(input$locationNum)) -->
+<!--          data -->
+<!--     }) -->
+
+
+<!-- # render plot with reactive ----- -->
+<!-- plotly::renderPlotly({ -->
+
+<!--     MonLocSalesReac() %>% -->
+<!--     # sort these by total_monthly_sales -->
+<!--     dplyr::arrange(desc(total_monthly_sales)) %>% -->
+<!--     # plot this as floor_month vs. monthly sales -->
+<!--     ggplot2::ggplot(data = ., -->
+<!--                     # month -->
+<!--                     aes(x = floor_month, -->
+<!--                         # total monthly sales here -->
+<!--                         y = total_monthly_sales)) + -->
+<!--     # add a line -->
+<!--     ggplot2::geom_line(aes(color = location), show.legend = FALSE) + -->
+<!--     # and a point -->
+<!--     ggplot2::geom_point(aes(color = location), show.legend = FALSE) + -->
+<!--     # and a theme -->
+<!--     ggplot2::theme(axis.title = -->
+<!--                      element_text()) + -->
+<!--     # with legend title -->
+<!--     ggplot2::theme(legend.title = -->
+<!--                      element_blank()) + -->
+<!--     # and the scales for dollar formats -->
+<!--     ggplot2::scale_y_continuous(labels = -->
+<!--                                   scales::dollar_format(accuracy = 1)) + -->
+<!--     # facet by the sales_region -->
+<!--     ggplot2::facet_wrap(location ~ sales_region, -->
+<!--                         scales = "free_x") + -->
+<!--     # adjust the x axis text -->
+<!--     ggplot2::theme(axis.text.x = -->
+<!--                      element_text(angle = 45, -->
+<!--                                   hjust = 0.5, -->
+<!--                                   vjust = 0.5)) + -->
+<!--     # add labs -->
+<!--     labs_monthly_location_sales -> ggTop100MonthlyLocationSales -->
+
+
+<!-- # convert to plotly -->
+<!-- plotly::hide_legend( -->
+<!--   plotly::toWebGL( -->
+<!--     plotly::ggplotly(ggTop100MonthlyLocationSales))) -->
+<!-- }) -->
+<!-- ``` -->
+
+
+
+Row {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
 ### Sales by Category
@@ -225,73 +309,116 @@ highcharter::hctreemap2(data = GroupedCanData,
 
 ```
 
-### Best Sellers
+### Best Selling Brand Categories
 
-```{r geom-col-top-25-brands}
+```{r geom-col-top-10-brand-categories}
 # define labels ----
-top_25_labs <- ggplot2::labs(x = "Brands",
+top_10brand_cat_labs <- ggplot2::labs(x = "Brands",
                              
                   y = "Count",
                   
-                  title = "Top 25 Cannabis Brands & Categories") 
+                  title = "Top 10 Cannabis Brands Categories") 
 
 # create session data
 cdata <- session$clientData
   
-# create Top25React reactive ----
+# create BrandCatTop10React reactive ----
 
-Top25React <- reactive({
+BrandCatTop10React <- reactive({
   
   # rename this reactive to generic data
   
-        data <- Top25Data
+        data <- BrandCatTop10
         
           data
         
 })
 
 # render plot with reactive -----
-shiny::renderPlot({
+plotly::renderPlotly({
   
-  data <- Top25React()
+  data <- BrandCatTop10React()
+  
+    data %>% 
+      
+      ggplot2::ggplot(aes(x = brand_category, 
+                      y = n)) +
+      
+    ggplot2::geom_col(aes(fill = brand_category), 
+                      show.legend = FALSE) +
+
+    ggplot2::coord_flip() +
+      
+    ggplot2::theme_minimal(base_size = 10, 
+                               
+                          base_family = "Ubuntu") +
+      
+    ggplot2::scale_fill_viridis_d(direction = -1) +
+    
+    top_10brand_cat_labs -> gg_top10_brand_categories
+    
+    # convert to plotly object
+    plotly::hide_legend(plotly::toWebGL(
+      plotly::ggplotly(p = gg_top10_brand_categories)))
+    
+})
+```
+
+### Best Selling Brands
+
+```{r geom-col-top-10-brands}
+# define labels ----
+top_10brand_labs <- ggplot2::labs(x = "Brands",
+                             
+                  y = "Count",
+                  
+                  title = "Top 10 Cannabis Brands") 
+
+# create session data
+cdata <- session$clientData
+  
+# create Top10React reactive ----
+
+Top10React <- reactive({
+  
+  # rename this reactive to generic data
+  
+        data <- Top10Brands
+        
+          data
+        
+})
+
+# render plot with reactive -----
+plotly::renderPlotly({
+  
+  data <- Top10React()
   
     data %>% 
       
     ggplot2::ggplot(aes(x = brand, 
-                      
-                      y = brand_cat_count, 
-                      
-                      group = brand_category)) +
-      
-    ggplot2::geom_col(aes(fill = brand),
-                      width = 0.60, 
+                      y = n)) +
+  
+    ggplot2::geom_col(aes(fill = brand), 
                       show.legend = FALSE) +
-      
-    ggplot2::coord_flip() +
-      
-    ggplot2::facet_wrap(. ~ brand_category, 
-                        
-               scales = "free") + 
+  
+
+    ggplot2::coord_flip() + 
       
     ggplot2::theme_minimal(base_size = 10, 
                                
                                base_family = "Ubuntu") +
       
-    top_25_labs -> gg_top_25
+    ggplot2::scale_fill_viridis_d(direction = -1) +
+      
+    top_10brand_labs -> gg_top10_brands
     
-    # keep as ggplot2 object
-    gg_top_25
+    
     
     # convert to plotly object
-    # plotly::toWebGL(
-    #   
-    #   plotly::ggplotly(p = gg_top_25, 
-    #                    
-    #                  width = cdata$output_pid_width, 
-    #                  
-    #                  height = cdata$output_pid_height)
-    #   
-    # )
+plotly::hide_legend(plotly::toWebGL(
+      plotly::ggplotly(p = gg_top10_brands)))
     
 })
 ```
+

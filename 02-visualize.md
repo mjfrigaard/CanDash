@@ -1,7 +1,7 @@
 Part 2 - Visualize Cannabis Data
 ================
 Martin Frigaard
-current version: 2020-03-19
+current version: 2020-04-25
 
 ## Load the packages
 
@@ -37,43 +37,44 @@ set](https://github.com/kushyapp/cannabis-dataset).
 
 ``` r
 # fs::dir_tree("data/processed/")
-CannabisWowData <- read_csv("data/processed/2020-03-17-CannabisWowData.csv")
+CannabisData <- readr::read_rds("data/processed/2020-04-24/2020-04-24-CannabisWowData.rds")
 ```
+
+First we remove all variables that contain the `prod`.
 
 ``` r
-CannabisWowData %>% dplyr::glimpse() 
+CanData <- CannabisData %>% 
+  # remove product data
+  dplyr::select(-dplyr::contains("prod")) 
+CanData %>% dplyr::glimpse(78)
 ```
 
-    #>  Observations: 2,799
-    #>  Variables: 21
+    #>  Rows: 2,799
+    #>  Columns: 17
     #>  $ id               <dbl> 404, 404, 404, 404, 404, 404, 216, 216, 216, 216, …
     #>  $ location         <chr> "California", "California", "California", "Califor…
-    #>  $ quantity         <dbl> 1296, 600, 600, 480, 360, 240, 240, 200, 192, 150,…
-    #>  $ unit_price       <dbl> 1.06, 0.42, 1.79, 0.36, 0.42, 2.55, 0.39, 1.74, 0.…
-    #>  $ cost_per_invoice <dbl> 1373.76, 252.00, 1074.00, 172.80, 151.20, 612.00, …
-    #>  $ product_name     <chr> "Sour Diesel", "Sour Diesel", "Sour Diesel", "Sour…
-    #>  $ prod_name_count  <dbl> 480, 480, 480, 480, 480, 480, 423, 423, 423, 423, …
-    #>  $ product_category <chr> "Flowers", "Flowers", "Flowers", "Pre-Roll", "Pre-…
-    #>  $ invoice_date     <date> 2020-10-07, 2020-07-24, 2020-10-06, 2020-04-18, 2…
-    #>  $ dow              <dbl> 7, 24, 6, 18, 18, 6, 28, 11, 8, 21, 12, 21, 23, 3,…
-    #>  $ week             <dbl> 41, 30, 40, 16, 12, 49, 44, 41, 15, 47, 28, 47, 21…
+    #>  $ quantity         <dbl> 612, 432, 402, 360, 320, 300, 300, 300, 288, 288, …
+    #>  $ unit_price       <dbl> 0.72, 0.95, 1.93, 3.39, 0.42, 0.34, 0.79, 1.95, 5.…
+    #>  $ amnt_per_invoice <dbl> 440.64, 410.40, 775.86, 1220.40, 134.40, 102.00, 2…
+    #>  $ invoice_date     <date> 2020-06-16, 2020-11-04, 2020-12-07, 2020-06-13, 2…
+    #>  $ dow              <int> 16, 4, 7, 13, 15, 13, 5, 9, 20, 21, 10, 15, 17, 18…
+    #>  $ week             <dbl> 24, 45, 49, 24, 16, 15, 49, 45, 38, 43, 45, 24, 42…
     #>  $ yr               <dbl> 2020, 2020, 2020, 2020, 2020, 2020, 2020, 2020, 20…
-    #>  $ week_year        <date> 2020-10-04, 2020-07-19, 2020-10-04, 2020-04-12, 2…
-    #>  $ month            <chr> "Oct", "Jul", "Oct", "Apr", "Mar", "Dec", "Oct", "…
-    #>  $ floor_month      <date> 2020-10-01, 2020-07-01, 2020-10-01, 2020-04-01, 2…
-    #>  $ invoice_no       <dbl> 570097, 561051, 569815, 550344, 546992, 580985, 57…
-    #>  $ stock_code       <chr> "20971", "21977", "85099F", "22546", "21977", "226…
-    #>  $ product_details  <chr> "Pre-roll", "Pre-roll", "Pre-roll", "Pre-roll", "P…
+    #>  $ week_year        <date> 2020-06-14, 2020-11-01, 2020-12-06, 2020-06-07, 2…
+    #>  $ month            <ord> Jun, Nov, Dec, Jun, Apr, Apr, Nov, Nov, Sep, Oct, …
+    #>  $ floor_month      <date> 2020-06-01, 2020-11-01, 2020-12-01, 2020-06-01, 2…
+    #>  $ invoice_no       <chr> "557125", "574341", "537456", "556574", "550272", …
+    #>  $ stock_code       <chr> "23288", "21874", "22469", "21137", "84535A", "214…
     #>  $ brand            <chr> "Medi Cone", "Medi Cone", "Medi Cone", "Medi Cone"…
     #>  $ brand_name       <chr> "Day Dreamers", "Day Dreamers", "Day Dreamers", "D…
     #>  $ brand_category   <chr> "Concentrates", "Edibles", "Medical", "Concentrate…
 
-This `data.frame` is a combination of some sales data with some product
-and brand data.
+This `data.frame` is a combination of simulated sales data and some
+product and brand data.
 
 ### Set the graph theme
 
-I like to use the `hrbrthemes::theme_ipsum_rc()`
+I like to use the `hrbrthemes::theme_ipsum_rc()` for themes.
 
 ``` r
 # set theme
@@ -86,56 +87,266 @@ ggplot2::theme_set(hrbrthemes::theme_ipsum_rc(
 ))
 ```
 
-## Most common brand categories
+## Top 10 brand categories
 
-These are the most common brands categories.
+These are the most common brands categories. First we create the data…
 
 ``` r
-CannabisWowData %>% 
+CanData %>% 
   dplyr::count(brand_category, sort = TRUE) %>% 
-  dplyr::mutate(brand_category = reorder(brand_category, n)) %>%
-  ggplot2::ggplot(aes(x = brand_category, y = n)) +
-    ggplot2::geom_col(aes(fill = brand_category), 
-                      show.legend = FALSE) +
-    ggplot2::labs(x = "Brand Category",
-                  y = "Count",
-                  title = "Most Common Cannabis Brand Categories") +
-    ggplot2::coord_flip()
+  utils::head(10) %>% 
+  dplyr::mutate(brand_category = reorder(brand_category, n)) -> BrandCatTop10
+
+# export BrandCatTop10 -----
+readr::write_rds(x = BrandCatTop10, 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-BrandCatTop10.rds"))
+# export BrandCatTop10 -----
+write_csv(as.data.frame(BrandCatTop10), 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-BrandCatTop10.csv"))
 ```
 
-![](figs/visualize-brand_category-1.png)<!-- -->
+Now we graph the brands
 
-This tells me there are 17 different categories for brands, and
-`Concentrates` are the most common brand category. I can also see
-`Flower` and `Edibles` are numbers two and three.
+``` r
+# define labels ----
+top_10brand_labs <- ggplot2::labs(x = "Brands",
+                             
+                  y = "Count",
+                  
+                  title = "Top 10 Cannabis Brands")
 
-## Most common product categories
+BrandCatTop10 %>% 
+  
+  ggplot2::ggplot(aes(x = brand_category, 
+                      y = n)) +
+    ggplot2::geom_col(aes(fill = brand_category), 
+                      show.legend = FALSE) +
+
+    ggplot2::coord_flip() +
+    
+    top_10brand_labs -> gg_top10_brand_categories
+
+gg_top10_brand_categories
+```
+
+![](figs/gg_top10_brand_categories-1.png)<!-- -->
+
+Convert this to a plotly object.
+
+``` r
+plotly::hide_legend(plotly::toWebGL(
+      plotly::ggplotly(p = gg_top10_brand_categories)))
+```
+
+![](figs/hide_legend-toWebGL-ggplotly-1.png)<!-- -->
+
+This tells me `Concentrates` are the most common brand category. I can
+also see `Flower` and `Edibles` are numbers two and three.
+
+## Top 10 Cannabis Brands
 
 These are the most common product categories, sorted with the most
 common first.
 
 ``` r
-CannabisWowData %>% 
-  dplyr::count(product_category, sort = TRUE) %>% 
-  dplyr::mutate(product_category = reorder(product_category, n)) %>%
-  ggplot2::ggplot(aes(x = product_category, y = n)) +
-    ggplot2::geom_col(aes(fill = product_category), 
-                      show.legend = FALSE) +
-    ggplot2::labs(x = "Product Category",
-                  y = "Count",
-                  title = "Most Common Cannabis Product Categories") +
-    ggplot2::coord_flip()
+CanData %>% 
+  dplyr::count(brand) %>%
+  utils::head(10) %>% 
+  dplyr::mutate(brand = reorder(brand, n)) -> Top10Brands
+
+# export Top10Brands -----
+readr::write_rds(x = Top10Brands, 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-Top10Brands.rds"))
+# export Top10Brands -----
+write_csv(as.data.frame(Top10Brands), 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-Top10Brands.csv"))
 ```
 
-![](figs/visualize-product_category-1.png)<!-- -->
+Now we plot this in a column chart.
+
+``` r
+# define labels ----
+top_10brand_labs <- ggplot2::labs(x = "Brands",
+                             
+                  y = "Count",
+                  
+                  title = "Top 10 Cannabis Brands") 
+
+Top10Brands %>%
+  ggplot2::ggplot(aes(x = brand, 
+                      y = n)) +
+  
+    ggplot2::geom_col(aes(fill = brand), 
+                      show.legend = FALSE) +
+  
+
+    ggplot2::coord_flip() + 
+    
+    top_10brand_labs -> gg_top10_brands
+
+gg_top10_brands
+```
+
+![](figs/gg_top10_brands-1.png)<!-- -->
+
+Convert to plotly
+
+``` r
+plotly::hide_legend(plotly::toWebGL(
+      plotly::ggplotly(p = gg_top10_brands)))
+```
+
+![](figs/gg_top10_brands-plotly-1.png)<!-- -->
+
+## Top 25 common brand & brand categories
+
+Now we can group these two variables and count them both, limiting this
+to the top 25.
+
+``` r
+Top25Data <- CanData %>%
+  dplyr::count(brand, brand_category) %>%
+  dplyr::arrange(desc(n)) %>% 
+  dplyr::rename(brand_cat_count = n) %>% 
+  dplyr::filter(brand_category %in% c("Concentrates", "Edibles", 
+                                      "Flower", "Medical")) %>% 
+  utils::head(25) %>% 
+  dplyr::mutate(brand = reorder(x = brand, 
+                                X = brand_cat_count))
+
+# export Top25Data -----
+readr::write_rds(x = Top25Data, 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-Top25Data.rds"))
+# export Top25Data -----
+readr::write_csv(as.data.frame(Top25Data), 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-Top25Data.csv"))
+```
+
+This plot was removed from the dashboard in version 0.0.4
+
+``` r
+# define labels ----
+top_25_labs <- ggplot2::labs(x = " ",
+                             
+                  y = "Count",
+                  
+                  title = "Top 25 Cannabis Brands & Categories") 
+
+# Top25Data col
+Top25Data %>%
+      
+    ggplot2::ggplot(aes(x = brand, 
+                      
+                      y = brand_cat_count, 
+                      
+                      group = brand_category)) +
+      
+    ggplot2::geom_col(aes(fill = brand),
+                      width = -.60, 
+                      show.legend = FALSE) +
+      
+    ggplot2::coord_flip() +
+      
+    ggplot2::facet_wrap(. ~ brand_category, 
+                        
+               scales = "free") + 
+      
+    ggplot2::theme_minimal(base_size = 10, 
+                               
+                               base_family = "Ubuntu") +
+      
+    top_25_labs -> gg_top_25
+
+plotly::hide_legend(plotly::toWebGL(
+      plotly::ggplotly(p = gg_top_25)))
+```
+
+![](figs/geom-col-Top25Data-1.png)<!-- -->
+
+## Create Top 100 Brands and Categories
+
+This creates a grouped data.frame/tibble on `brand_category` and
+`quantity`.
+
+``` r
+Top100BrandCatsData <- CanData %>%
+  # group this by brand categories and quantity
+  dplyr::group_by(brand_category, quantity) %>% 
+  # summarize the sales
+  dplyr::summarise(sales_by_cat = n()) %>% 
+  # ungroup this data
+  dplyr::ungroup() %>% 
+  # get the top 100
+  dplyr::sample_n(75)
+
+# export Top100BrandCatsData -----
+readr::write_rds(x = Top100BrandCatsData, 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-Top100BrandCatsData.rds"))
+# export Top100BrandCatsData -----
+write_csv(as.data.frame(Top100BrandCatsData), 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-Top100BrandCatsData.csv"))
+```
+
+## Treemap (`highcharter::hctreemap2`)
+
+This `treemap` is built with the `Top100BrandCatsData`.
+
+``` r
+library(highcharter)
+library(viridisLite)
+library(treemap)
+thm <- 
+  hc_theme(
+    colors = c("#1a6ecc", "#434348", "#90ed7d"),
+    chart = list(
+      backgroundColor = "transparent",
+      style = list(fontFamily = "Ubuntu")
+    ),
+    xAxis = list(
+      gridLineWidth = 1
+    )
+  )
+
+highcharter::hctreemap2(Top100BrandCatsData, 
+              group_vars = c("brand_category"),
+              size_var = "sales_by_cat", 
+              color_var = "sales_by_cat",
+              layoutAlgorithm = "squarified",
+              levelIsConstant = FALSE,
+              allowDrillToNode = TRUE) %>% 
+  
+    # add the RColorBrewer greens 
+  
+    hc_colorAxis(minColor = RColorBrewer::brewer.pal(7, "Greens")[1],
+                 
+                 maxColor = RColorBrewer::brewer.pal(7, "Greens")[7]) 
+```
+
+![](figs/Top100BrandCatsData-1.png)<!-- -->
 
 ## Creating week over week data
 
-The code below creates a data.frame that is ‘week-over-week’, which is
+The code below creates a `data.frame` that is ‘week-over-week’, which is
 not an uncommon way of reporting sales data.
 
 ``` r
-WeekOverWeek <- CannabisWowData %>%
+WeekOverWeek <- CanData %>%
     # get the week_year by quantity
   select(week_year, quantity) %>%
     # group these data
@@ -154,78 +365,25 @@ WeekOverWeek <- CannabisWowData %>%
     # and we group this final data set by the week_year variable
   group_by(week_year)
 # check this data set
-WeekOverWeek %>% utils::str()
+WeekOverWeek %>% dplyr::glimpse(78)
 ```
 
-    #>  Classes 'grouped_df', 'tbl_df', 'tbl' and 'data.frame': 52 obs. of  5 variables:
-    #>  $ week_year : Date, format: "2019-12-29" "2020-01-05" ...
-    #>  $ week_qty : num 47 432 366 400 260 320 402 318 ...
-    #>  $ prev_week : num NA 47 432 366 400 260 320 402 ...
-    #>  $ wow_quantity: num NA 8.1915 -0.1528 0.0929 ...
-    #>  $ month : Ord.factor w/ 12 levels "Jan"<"Feb"<"Mar"<..: 12 1 1 1 1 2 2 2 ...
-    #>  - attr(*, "groups")=Classes 'tbl_df', 'tbl' and 'data.frame': 52 obs. of 2
-    #>     variables:
-    #>  ..$ week_year: Date, format: "2019-12-29" "2020-01-05" ...
-    #>  ..$ .rows :List of 52
-    #>  .. ..$ : int 1
-    #>  .. ..$ : int 2
-    #>  .. ..$ : int 3
-    #>  .. ..$ : int 4
-    #>  .. ..$ : int 5
-    #>  .. ..$ : int 6
-    #>  .. ..$ : int 7
-    #>  .. ..$ : int 8
-    #>  .. ..$ : int 9
-    #>  .. ..$ : int 10
-    #>  .. ..$ : int 11
-    #>  .. ..$ : int 12
-    #>  .. ..$ : int 13
-    #>  .. ..$ : int 14
-    #>  .. ..$ : int 15
-    #>  .. ..$ : int 16
-    #>  .. ..$ : int 17
-    #>  .. ..$ : int 18
-    #>  .. ..$ : int 19
-    #>  .. ..$ : int 20
-    #>  .. ..$ : int 21
-    #>  .. ..$ : int 22
-    #>  .. ..$ : int 23
-    #>  .. ..$ : int 24
-    #>  .. ..$ : int 25
-    #>  .. ..$ : int 26
-    #>  .. ..$ : int 27
-    #>  .. ..$ : int 28
-    #>  .. ..$ : int 29
-    #>  .. ..$ : int 30
-    #>  .. ..$ : int 31
-    #>  .. ..$ : int 32
-    #>  .. ..$ : int 33
-    #>  .. ..$ : int 34
-    #>  .. ..$ : int 35
-    #>  .. ..$ : int 36
-    #>  .. ..$ : int 37
-    #>  .. ..$ : int 38
-    #>  .. ..$ : int 39
-    #>  .. ..$ : int 40
-    #>  .. ..$ : int 41
-    #>  .. ..$ : int 42
-    #>  .. ..$ : int 43
-    #>  .. ..$ : int 44
-    #>  .. ..$ : int 45
-    #>  .. ..$ : int 46
-    #>  .. ..$ : int 47
-    #>  .. ..$ : int 48
-    #>  .. ..$ : int 49
-    #>  .. ..$ : int 50
-    #>  .. ..$ : int 51
-    #>  .. ..$ : int 52
-    #>  ..- attr(*, ".drop")= logi TRUE
+    #>  Rows: 52
+    #>  Columns: 5
+    #>  Groups: week_year [52]
+    #>  $ week_year    <date> 2019-12-29, 2020-01-05, 2020-01-12, 2020-01-19, 2020-…
+    #>  $ week_qty     <dbl> 28, 478, 273, 330, 328, 512, 304, 431, 232, 193, -868,…
+    #>  $ prev_week    <dbl> NA, 28, 478, 273, 330, 328, 512, 304, 431, 232, 193, -…
+    #>  $ wow_quantity <dbl> NA, 16.071428571, -0.428870293, 0.208791209, -0.006060…
+    #>  $ month        <ord> Dec, Jan, Jan, Jan, Jan, Feb, Feb, Feb, Feb, Mar, Mar,…
 
-Here we see there is a data.frame with 52 rows (one for each week).
+Here we see there is a data.frame with 52 rows (one for each week). And
+this data set is still grouped, but that won’t be an issue.
 
 ## Plot annual sales (by week)
 
-These are the annual sales (line plots) by week, faceted by month.
+First we will reset the graph theme to a little smaller font to allow
+the dates to show up on the x-axis.
 
 ``` r
 # set theme
@@ -238,9 +396,67 @@ ggplot2::theme_set(hrbrthemes::theme_ipsum_rc(
 ))
 ```
 
+## Create quarter drop-down
+
+We will create a quarter drop-down variable for the dashboard. The data
+we created above allows us to plot the week over week sales by their
+brand categories.
+
+We will plot these data by quarters:
+
+  - Q1 = Oct, Nov, and Dec  
+  - Q2 = Jan, Feb, and Mar  
+  - Q3 is Apr, May, and Jun  
+  - Q4 is Jul, Aug, and Sep
+
+<!-- end list -->
+
+``` r
+WeekOverWeek <- WeekOverWeek %>% 
+  dplyr::mutate(quar = case_when(
+    month %in% c("Jan", "Feb", "Mar") ~ 1,
+    month %in% c("Apr", "May", "Jun") ~ 2,
+    month %in% c("Jul", "Aug", "Sep") ~ 3,
+    month %in% c("Oct", "Nov", "Dec") ~ 4),
+    # turn into factor
+    quar_fct = factor(quar, 
+                      levels = c(1, 2, 3, 4),
+                      labels = c("Q1", "Q2", "Q3", "Q4"),
+                      ordered = TRUE))
+# check
+WeekOverWeek %>% 
+  group_by(quar_fct) %>% 
+  count(quar) %>% 
+  spread(quar_fct, n)
+```
+
+    #>  # A tibble: 4 x 5
+    #>     quar    Q1    Q2    Q3    Q4
+    #>    <dbl> <int> <int> <int> <int>
+    #>  1     1    13    NA    NA    NA
+    #>  2     2    NA    13    NA    NA
+    #>  3     3    NA    NA    13    NA
+    #>  4     4    NA    NA    NA    13
+
+Export the week over week.
+
+``` r
+# export WeekOverWeek -----
+readr::write_rds(x = WeekOverWeek, 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-WeekOverWeek.rds"))
+# export WeekOverWeek -----
+write_csv(as.data.frame(WeekOverWeek), 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-WeekOverWeek.csv"))
+```
+
 ## Week over week annual Sales
 
-These are the week over week annual sales.
+These are the week over week annual sales (quantity), faceted by
+`month`, which needs at least one level.
 
 ``` r
   # these are the labels
@@ -249,17 +465,27 @@ labs_wow_annual_sales <- ggplot2::labs(
   x = 'Week', 
   title = 'Week Over Week Annual Sales',
   subtitle = "Simulated Cannabis Sales Data",
-  caption = "graphic and analysis by PDG") 
+  caption = "Graphic and analysis by PDG") 
 
-ggWoWAnnualSales <- WeekOverWeek %>% 
+WeekOverWeek %>% 
+  # remove missing 
+  tidyr::drop_na() %>% 
+            # filter this by the quarter (which will be in dropdown)
+            dplyr::filter(.data = ., 
+                          
+                          quar == 4) %>% 
+  
   # this will put week_year on the x
     ggplot2::ggplot(aes(x = week_year, 
                         # and the week over week quantity on the y
                         y = wow_quantity)) +
+                        # group by month
   # add the line plot
-    ggplot2::geom_line() +
+    ggplot2::geom_line(aes(color = month), 
+                       show.legend = FALSE) +
   # and the point
-    ggplot2::geom_point() +
+    ggplot2::geom_point(aes(color = month), 
+                        show.legend = FALSE) +
   # the axis title here will inherit the size and color
     ggplot2::theme(axis.title = element_text(face = c("bold"))) +
   # this will remove the legend
@@ -268,37 +494,94 @@ ggWoWAnnualSales <- WeekOverWeek %>%
     ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1),) +
   # here we facet by the month
     ggplot2::facet_wrap(. ~ month, 
-                        # 
                         scales = "free") + 
     ggplot2::theme(axis.text.x = 
                      element_text(angle = 45, 
                                   hjust = 0.5, 
                                   vjust = 0.5)) +
-  labs_wow_annual_sales
-ggWoWAnnualSales 
+  
+  labs_wow_annual_sales -> gg_wow_sales
 ```
 
-![](figs/ggWoWAnnualSales-1.png)<!-- -->
+``` r
+# Convert this to a `plotly` object.
+plotly::hide_legend(
+plotly::toWebGL(plotly::ggplotly(p = gg_wow_sales,
+                                 tooltip = c("x", "y"))))
+```
 
-This shows some missing data in December, and a lot of variance in the
-sales from month to month. We can check the missing data for December
-using the data summary below.
+![](figs/plotly-gg_wow_sales-1.png)<!-- -->
+
+### Missing December Data
+
+Below are the missing data in December.
 
 ``` r
-knitr::kable(
 WeekOverWeek %>% 
   dplyr::filter(month == "Dec") %>% 
   dplyr::select(week_year, 
-                wow_quantity))
+                wow_quantity)
 ```
 
-| week\_year    |                                                                             wow\_quantity |
-| :------------ | ----------------------------------------------------------------------------------------: |
-| 2019-12-29    |                                                                                        NA |
-| 2020-12-06    |                                                                                 1.2083863 |
-| 2020-12-13    |                                                                               \-0.6846951 |
-| 2020-12-20    |                                                                               \-0.8467153 |
-| We can see th | e data are missing for December of 2019. We’ll remove this and plot the non-missing data. |
+    #>  # A tibble: 4 x 2
+    #>  # Groups:   week_year [4]
+    #>    week_year  wow_quantity
+    #>    <date>            <dbl>
+    #>  1 2019-12-29      NA     
+    #>  2 2020-12-06       0.0392
+    #>  3 2020-12-13      -0.718 
+    #>  4 2020-12-20      -0.879
+
+This shows some missing data in December, and a lot of variation in the
+sales from month to month.
+
+### Week over week invoice amount
+
+This will give the user a categorical variable to filter the week over
+week sales by the amount per invoice.
+
+``` r
+WowAmntPerInvoice <- CanData %>%
+  
+  # get the week_year by amnt_per_invoice
+  select(week_year, amnt_per_invoice) %>%
+  
+  # group these data by week year
+  group_by(week_year) %>%
+  
+  # summarize the data by weekly quantity
+  summarize(week_amnt_per_inv = sum(amnt_per_invoice)) %>%
+  
+  # This introduces the lag function, "compute a lagged version of a time 
+  # series, shifting the time base back by a given number of observations.
+  mutate(prev_week_amnt_per_inv = lag(week_amnt_per_inv, 1)) %>%
+  
+  # now we get the ratio of the difference between the weekly quantity and 
+  # the previous week, and we divide that by the previous week.
+  mutate(wow_cost_per_inv = (week_amnt_per_inv - prev_week_amnt_per_inv) / 
+                                                     prev_week_amnt_per_inv) %>%
+  
+  # now we calculate the month, using week_year, abbreviations, and labels
+  mutate(month = month(week_year, abbr = TRUE, label = TRUE)) %>%
+  
+  # finally, we group this final data set by the week_year variable
+  group_by(week_year)
+
+# check this data set
+WowAmntPerInvoice %>% glimpse()
+```
+
+    #>  Rows: 52
+    #>  Columns: 5
+    #>  Groups: week_year [52]
+    #>  $ week_year              <date> 2019-12-29, 2020-01-05, 2020-01-12, 2020-01…
+    #>  $ week_amnt_per_inv      <dbl> 48.55, 727.04, 1051.97, 839.11, 441.39, 846.…
+    #>  $ prev_week_amnt_per_inv <dbl> NA, 48.55, 727.04, 1051.97, 839.11, 441.39, …
+    #>  $ wow_cost_per_inv       <dbl> NA, 13.9750772, 0.4469218, -0.2023442, -0.47…
+    #>  $ month                  <ord> Dec, Jan, Jan, Jan, Jan, Feb, Feb, Feb, Feb,…
+
+We can see the data are missing for December of 2019. We’ll remove this
+and plot the non-missing data.
 
 ``` r
 # labels
@@ -356,7 +639,9 @@ ggWowQuantity <- WeekOverWeek %>%
   # add points
     ggplot2::geom_point() +
     labs_quantity_per_week
-ggWowQuantity
+
+# convert to plotly
+plotly::toWebGL(plotly::ggplotly(ggWowQuantity))
 ```
 
 ![](figs/ggWowQuantity-1.png)<!-- -->
@@ -379,38 +664,88 @@ Next we create the monthly sales data frame, with the `unit_price`,
 `quantity`, `location`, and `floor_month`.
 
 ``` r
-MonthlyLocationSales <- CannabisWowData %>% 
+MonthlyLocationSales <- CannabisData %>% 
     # get the floor_month. location, quantity, and unit_price
     dplyr::select(floor_month, 
                   location, 
                   quantity,  
                   unit_price) %>%
-    # we can create the "sales"
-    dplyr::mutate(sales = quantity*unit_price) %>%
+    # we can create the new location variable
+    dplyr::mutate(
+            sales = quantity*unit_price, 
+            location = case_when(
+              # California
+              location %in% "Salisbury Postcode Area (UK)" ~ "California",
+              # Arizona
+              location %in% "Nova Scotia" ~ "Arizona",   
+              # Colorado
+              location %in% "British Columbia" ~ "Colorado",
+              location %in% "Alberta" ~ "Colorado",
+              # Oregon
+              location %in% "Ontario" ~ "Oregon",        
+              location %in% "Michigan" ~ "Oregon",
+              # Washington
+              location %in% "Newfoundland" ~ "Washington",
+              location %in% "Manitoba" ~ "Washington",        
+              location %in% "Saskatchewan" ~ "Washington",
+              # else is location
+              TRUE ~ location)) %>% 
     # now we group by the floor_month and location
     dplyr::group_by(floor_month, location) %>%
     # and summarize this by the monthly_sales and median sales
     dplyr::summarize(total_monthly_sales = sum(sales, na.rm = TRUE), 
                      median_monthly_sales = median(sales, na.rm = TRUE)) %>%
     # and group it by the floor_month and location
-    dplyr::group_by(floor_month, location) %>% 
-    # remove the SP location
-    dplyr::filter(location != "SP")
+    dplyr::mutate(sales_region = case_when(
+                location == "Colorado" ~ "West/Mountain",
+                location == "Arizona" ~ "West/Mountain",
+                location == "Nevada" ~ "West/Mountain",
+  
+                location == "California" ~ "West/Pacific",
+                location == "Oregon" ~ "West/Pacific",
+                location == "Washington" ~ "West/Pacific"),
+              
+                sales_reg_num = case_when(
+                sales_region %in% "West/Pacific" ~ 1,
+                sales_region %in% "West/Mountain" ~ 2)) %>% 
+  
+    dplyr::group_by(floor_month, location)
 # check new data 
-MonthlyLocationSales %>% dplyr::glimpse(78)
+MonthlyLocationSales %>% 
+  # check
+  group_by(sales_region) %>% 
+  count(sales_reg_num) %>% 
+  spread(sales_region, n)
 ```
 
-    #>  Observations: 138
-    #>  Variables: 4
-    #>  Groups: floor_month, location [138]
-    #>  $ floor_month          <date> 2019-12-01, 2019-12-01, 2020-01-01, 2020-01-0…
-    #>  $ location             <chr> "California", "Washington", "Arizona", "Britis…
-    #>  $ total_monthly_sales  <dbl> 30.18, 19.45, 149.95, 122.22, 1477.13, 140.53,…
-    #>  $ median_monthly_sales <dbl> 12.960, 9.725, 13.800, 31.200, 6.960, 5.405, 5…
+    #>  # A tibble: 2 x 3
+    #>    sales_reg_num `West/Mountain` `West/Pacific`
+    #>            <dbl>           <int>          <int>
+    #>  1             1              NA             38
+    #>  2             2              36             NA
+
+``` r
+# export MonthlyLocationSales -----
+readr::write_rds(x = MonthlyLocationSales, 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-MonthlyLocationSales.rds"))
+# export MonthlyLocationSales -----
+readr::write_csv(as.data.frame(MonthlyLocationSales), 
+          path = paste0("data/processed/", 
+                        base::noquote(lubridate::today()),
+                        "-MonthlyLocationSales.csv"))
+
+fs::dir_ls("data/processed/", 
+           regexp = "-MonthlyLocationSales")
+```
+
+    #>  data/processed/2020-04-25-MonthlyLocationSales.csv
+    #>  data/processed/2020-04-25-MonthlyLocationSales.rds
 
 This gives us a grouped `data.frame` with 138 rows.
 
-## Total Monthly Sales by Location
+## Total Monthly Sales by Region/Location
 
 This plot will graph the monthly sales of cannabis products by their
 location (abbreviated).
@@ -418,23 +753,25 @@ location (abbreviated).
 ``` r
 # labels
 labs_monthly_location_sales <- ggplot2::labs(y = 'Total Monthly Sales',
-                  x = 'Month',
-                  title = 'Total Monthly Sales By Location')
+                  x = ' ',
+                  title = 'Total Monthly Sales By Region & Location')
 
 # plot
-ggTop100MonthlyLocationSales <- MonthlyLocationSales %>%
+MonthlyLocationSales %>%
     # sort these by total_monthly_sales
     dplyr::arrange(desc(total_monthly_sales)) %>% 
     # plot this as floor_month vs. monthly sales
+    dplyr::filter(sales_reg_num == 2) %>% 
+    # plot
     ggplot2::ggplot(data = ., 
                     # month
                     aes(x = floor_month, 
                         # total monthly sales here
                         y = total_monthly_sales)) +
     # add a line
-    ggplot2::geom_line() +
+    ggplot2::geom_line(aes(color = location), show.legend = FALSE) +
     # and a point
-    ggplot2::geom_point() +
+    ggplot2::geom_point(aes(color = location), show.legend = FALSE) +
     # and a theme
     ggplot2::theme(axis.title = 
                      element_text()) +   
@@ -444,25 +781,29 @@ ggTop100MonthlyLocationSales <- MonthlyLocationSales %>%
     # and the scales for dollar formats
     ggplot2::scale_y_continuous(labels = 
                                   scales::dollar_format(accuracy = 1)) +
-    # facet by the location
-    ggplot2::facet_wrap(. ~ location, 
-                        scales = "free", 
-                        ncol = 4) + 
+    # facet by the sales_region
+    ggplot2::facet_wrap(location ~ sales_region, 
+                        scales = "free_x") + 
     # adjust the x axis text
     ggplot2::theme(axis.text.x = 
                      element_text(angle = 45, 
                                   hjust = 0.5, 
                                   vjust = 0.5)) +
-    # 
-    labs_monthly_location_sales
-ggTop100MonthlyLocationSales 
+    # add labs
+    labs_monthly_location_sales -> ggTop100MonthlyLocationSales
+
+
+# convert to plotly
+plotly::hide_legend(
+  plotly::toWebGL(
+    plotly::ggplotly(ggTop100MonthlyLocationSales)))
 ```
 
 ![](figs/ggTop100MonthlyLocationSales-1.png)<!-- -->
 
-Faceting by location and having months on the x axis is helpful for
-spotting trends, but graphs like this can help us spot gaps in total
-sales by location (i.e. California vs. Manitoba).
+Faceting by region and coloring by region while having months on the x
+axis is helpful for spotting trends. Graphs like this can help us spot
+gaps in total sales by location (i.e. California vs. Manitoba).
 
 ## Median Order Sales by Location
 
@@ -514,28 +855,10 @@ ggMedianOrderValue
 Time-stamp and export.
 
 ``` r
-# export CannabisWowData -----
-write_csv(as.data.frame(CannabisWowData), 
-          path = paste0("data/processed/", 
-                        base::noquote(lubridate::today()),
-                        "-CannabisWowData.csv"))
-# export WeekOverWeek -----
-write_csv(as.data.frame(WeekOverWeek), 
-          path = paste0("data/processed/", 
-                        base::noquote(lubridate::today()),
-                        "-WeekOverWeek.csv"))
-
-# export MonthlyLocationSales -----
-write_csv(as.data.frame(MonthlyLocationSales), 
-          path = paste0("data/processed/", 
-                        base::noquote(lubridate::today()),
-                        "-MonthlyLocationSales.csv"))
-
-fs::dir_tree("data/processed/", recurse = FALSE)
+fs::dir_tree("data/processed/", 
+             regex = "2020-04-21",
+             recurse = FALSE)
 ```
 
     #>  data/processed/
-    #>  ├── 2020-03-17-CannabisWowData.csv
-    #>  ├── 2020-03-19-CannabisWowData.csv
-    #>  ├── 2020-03-19-MonthlyLocationSales.csv
-    #>  └── 2020-03-19-WeekOverWeek.csv
+    #>  └── 2020-04-21
