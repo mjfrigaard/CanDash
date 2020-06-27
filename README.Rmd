@@ -60,80 +60,11 @@ knitr::include_graphics("figs/candash-overview.png")
 
 The data model for the `CanDash` application had to be constructed from a few different sources. First, a list of products, brands, and other categorical data were imported form the Kushy application on Github. You can find the original data for this project [here](https://github.com/kushyapp/cannabis-dataset). 
 
-We had to simulate the cost data for the products in the `Products` and `Brands` tables. Read more about this process in the [`01.1-wrangle.md` file](). 
+We had to simulate the cost data for the products in the `Products` and `Brands` tables. Read more about this process in the [`01.1-wrangle.md` file](https://github.com/mjfrigaard/CanDash/blob/master/01.1-wrangle.md). 
 
-```{r data-objects, echo=FALSE}
-fs::dir_tree(".", recurse = TRUE)
-```
+## The visualizations
 
-## Import
-
-The data for the dashboard are imported below (We pick the latest version).
-
-```{r import-CannabisWowData, message=FALSE, warning=FALSE}
-# fs::dir_tree("data/processed/")
-CannabisWowData <- readr::read_csv("data/processed/2020-04-17-CannabisWowData.csv")
-CannabisWowData %>% dplyr::glimpse(78)
-```
-
-## Date ranges 
-
-Below we summarize the date ranges in this dataset.
-
-```{r date-ranges}
-CannabisWowData %>% 
-  dplyr::summarize(min_invoice_date = min(invoice_date, na.rm = TRUE),
-                   max_invoice_date = max(invoice_date, na.rm = TRUE),
-                   min_week_year = min(week_year, na.rm = TRUE),
-                   max_week_year = max(week_year, na.rm = TRUE))
-```
-
-These will help in determining what inputs to set on the dashboard. 
-
-### Missing data 
-
-These data are missing from the final `CannabisWowData`.
-
-```{r NAProducts}
-NAProducts <- inspectdf::inspect_na(df1 = CannabisWowData)
-NAProducts %>% 
-  inspectdf::show_plot(text_labels = TRUE) +
-  ggplot2::coord_flip()
-```
-
-## Categorical data 
-
-These are the categorical variables in the `CannabisWowData`. 
-
-```{r CannabisWowCats}
-CannabisWowCats <- CannabisWowData %>% 
-  dplyr::select_if(is.character) %>% 
-  inspectdf::inspect_cat()
-CannabisWowCats %>% 
-  inspectdf::show_plot(text_labels = TRUE) 
-```
-
-We can see the overwhelming number of the data are `Topicals` and `Concentrates` from `California`, in the months of `Nov/Oct`, etc.
-
-## Numerical data 
-
-These are the categorical variables in the `CannabisWowData`. 
-
-```{r CannabisWowNums}
-CannabisWowNums <- CannabisWowData %>%
-  # get numeric variables 
-  dplyr::select(c(amnt_per_invoice, 
-                  quantity, 
-                  unit_price, 
-                  prod_name_count)) %>% 
-  inspectdf::inspect_num()
-CannabisWowNums %>% 
-  # plot these with color and layout
-  inspectdf::show_plot(col_palette = 2, 
-                       plot_layout = c(2, 2)) 
-```
-
-Here we can see the `amnt_per_invoice`, `prod_name_count`, `quantity`, and `unit_price` are skewed heavily towards 0. 
+All the visualizations were built in the [`02-visualize.md`](https://github.com/mjfrigaard/CanDash/blob/master/02-visualize.md) file using [`ggplot2`](https://ggplot2.tidyverse.org/), [`plotly`](https://github.com/ropensci/plotly#readme), and [`highcharter`](http://jkunst.com/highcharter/).
 
 
 
