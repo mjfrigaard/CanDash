@@ -1,5 +1,5 @@
 ---
-title: "CanDash (v0.0.4)"
+title: "CanDash (v0.0.6)"
 author: "Martin Frigaard"
 output: 
   flexdashboard::flex_dashboard:
@@ -24,26 +24,25 @@ library(treemap)
 library(RColorBrewer)
 library(ggthemes)
 library(magrittr)
-# fs::dir_ls("data/processed/", 
-#            regex = "-MonthlyLocationSales")
+# fs::dir_ls("data/processed/", regexp = "2020-06-27")
 # import MonthlyLocationSales ------
-MonthlyLocationSales <- read_rds("data/processed/2020-04-25-MonthlyLocationSales.rds")
-# import BrandCatTop10 ------
-BrandCatTop10 <- read_rds("data/processed/2020-04-25-BrandCatTop10.rds")
+MonthlyLocationSales <- read_rds("data/processed/2020-06-27-MonthlyLocationSales.rds")
+# import ProdCatTop10 ------
+ProdCatTop10 <- read_rds("data/processed/2020-06-27-ProdCatTop10.rds")
 # import Top10Brands ------
-Top10Brands <- read_rds("data/processed/2020-04-25-Top10Brands.rds")
+Top10Brands <- read_rds("data/processed/2020-06-27-Top10Brands.rds")
 # load the data into the dashboard 
 # import WeekOverWeek ------
-WeekOverWeek <- readr::read_rds("data/processed/2020-04-25-WeekOverWeek.rds")
+WeekOverWeek <- readr::read_rds("data/processed/2020-06-27-WeekOverWeek.rds")
 WeekOverWeek <- WeekOverWeek %>% 
   # make sure this is all positive!
   dplyr::mutate(week_qty = abs(week_qty)) %>%
   # remove missing
   tidyr::drop_na()
 # import GroupedCanData ------
-GroupedCanData <- read_rds("data/processed/2020-04-25-Top100BrandCatsData.rds")
+GroupedCanData <- read_rds("data/processed/2020-06-27-GroupedCanData.rds")
 # import Top25Data ----
-Top25Data <- read_rds("data/processed/2020-04-25-Top25Data.rds")
+Top25Data <- read_rds("data/processed/2020-06-27-Top25Data.rds")
 ```
 
 Column {.sidebar}
@@ -53,7 +52,17 @@ This is a sample sales dashboard for cannabis products.
 
 **The Data**
 
-These data have been simulated from the UK e-commerce dataset from the [UCI Machine Learning Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail) and the [Kushy cannabis data sets](https://github.com/kushyapp/cannabis-dataset). 
+These data have been simulated from the [Kushy cannabis data sets](https://github.com/kushyapp/cannabis-dataset). 
+
+Select a year below to view the sales across a 12-month period
+
+```{r select-year}
+shiny::selectInput(inputId = "yearNum", 
+                   label = h3("Year"), 
+    choices = list("2018" = 2018, "2019" = 2019), 
+    selected = 1)
+```
+
 
 Select a quarter below to view the sales across a three-month period
 
@@ -75,14 +84,15 @@ shiny::selectInput(inputId = "locationNum",
 ```
 
 
-
 **The Dashboard**
 
 This dashboard was built using [`flexdashboard`](https://rmarkdown.rstudio.com/flexdashboard/), interactive dashboards written in [Rmarkdown](https://rmarkdown.rstudio.com/) and [Shiny](https://shiny.rstudio.com/).
 
 **The Graphics**
 
-The line graphs were built using [`ggplot2`](https://ggplot2.tidyverse.org/) and [`plotly`](https://github.com/ropensci/plotly#readme), with theme components from [`hrbrthemes`](https://hrbrmstr.github.io/hrbrthemes/). Zoom in on particular with click and drag (read more [here](https://plotly.com/chart-studio-help/zoom-pan-hover-controls/)).
+The line graphs were built using [`ggplot2`](https://ggplot2.tidyverse.org/) and [`plotly`](https://github.com/ropensci/plotly#readme), with theme components from [`hrbrthemes`](https://hrbrmstr.github.io/hrbrthemes/). 
+
+Zoom in on particular with click and drag (read more [here](https://plotly.com/chart-studio-help/zoom-pan-hover-controls/)).
 
 The `treemap` was built with [`highcharter`](http://jkunst.com/highcharter/).
 
@@ -100,17 +110,15 @@ Median order amount per week in each State/Region
 
 ***Daily Sales by Category***
 
-This [treemap](https://en.wikipedia.org/wiki/Treemapping) displays the largest selling cannabis categories per day
+This [treemap](https://en.wikipedia.org/wiki/Treemapping) displays the largest selling cannabis product categories per day
 
-***Best Selling Brand Categories***
+***Best Selling Product Categories***
 
-A column chart for the best performing categories per month
+A column chart for the best performing product categories per month
 
 ***Best Selling Brands***
 
 A column chart for the best performing brands per month
-
-<!--{data-width=600}--> 
 
 Row {.tabset .tabset-fade}
 -------------------------------------
@@ -132,8 +140,8 @@ ggplot2::theme_set(hrbrthemes::theme_ipsum_rc(
 WowReact <- reactive({
   # rename this reactive to generic data
         data <- WeekOverWeek %>%
-          # remove missing
-          tidyr::drop_na()
+                # filter year
+                dplyr::filter(invoice_year == as.numeric(input$yearNum))
           # return data
           data
         
@@ -177,16 +185,20 @@ labs_wow_annual_sales <- ggplot2::labs(
   y = 'Sales', 
   x = ' ', 
   title = 'Week Over Week Annual Sales',
-  subtitle = "Quarter 3 Simulated Cannabis Sales Data",
+  subtitle = "Simulated Cannabis Sales Data by Quarter",
   caption = "Graphic and analysis by PDG") 
 
 # create reactive (QDataReact) for quarter data ----
 QDataReact <- reactive({
   # rename this reactive to generic data
           # filter this to the selected option from the side-panel
-         data <- dplyr::filter(WeekOverWeek, 
-                      # set numerical category for numerical quarter variable
-                        quar == as.numeric(input$quarterNum))
+         data <- WeekOverWeek %>% 
+              # limit range of dates
+              filter(invoice_year == as.numeric(input$yearNum) & 
+                             quar == as.numeric(input$quarterNum)) %>% 
+                        
+              # remove missing 
+              tidyr::drop_na()
          
          data
     })
@@ -202,7 +214,7 @@ plotly::renderPlotly({
    
    gg_wow_sales <- data %>% 
   
-  # this will put week_year on the x
+   # this will put week_year on the x
     ggplot2::ggplot(aes(x = week_year, 
                         # and the week over week quantity on the y
                         y = wow_quantity,
@@ -257,14 +269,18 @@ plotly::renderPlotly({
 labs_median_order_value <- ggplot2::labs(
                   y = 'Median Order Amount', 
                   x = ' ',
-                  title = 'Median Order Amount by Location')
+                  title = 'Median Monthly Order Amount by Location')
 
 # create reactive (MonLocSalesReac) for Location data ----
 MonLocSalesReac <- reactive({
   # rename this reactive to generic data
-         data <- dplyr::filter(MonthlyLocationSales,
-                      # set numerical category for numerical sales region
-                        sales_reg_num == as.numeric(input$locationNum))
+         data <- MonthlyLocationSales %>%
+                  # sort these by total_monthly_sales
+                  dplyr::arrange(desc(tot_mnth_sale_loc)) %>% 
+                  # select category for location
+                  dplyr::filter(sales_reg_num == input$locationNum & 
+                                  # select category for quarter
+                                invoice_year == as.numeric(input$yearNum))
          data
     })
 
@@ -273,18 +289,16 @@ MonLocSalesReac <- reactive({
 plotly::renderPlotly({
 
     MonLocSalesReac() %>%
-    # sort these by total_monthly_sales
-    dplyr::arrange(desc(median_monthly_sales)) %>% 
-    # plot this as floor_month vs. monthly sales
+    # plot
     ggplot2::ggplot(data = ., 
                     # put months on the x 
            mapping = aes(x = floor_month, 
                          # median monthly sales
-                         y = median_monthly_sales)) +
+                         y = med_mnth_sale_loc)) +
     # add the line
-    ggplot2::geom_line() +
+    ggplot2::geom_line(color = "green4", show.legend = FALSE) +
     # add the point
-    ggplot2::geom_point() +
+    ggplot2::geom_point(color = "green4", show.legend = FALSE) +
     # add the y format
     ggplot2::scale_y_continuous(labels = 
                                     scales::dollar_format(accuracy = 1)) +
@@ -300,7 +314,6 @@ plotly::renderPlotly({
                                   vjust = 0.5)) +
   # add the labels
   labs_median_order_value -> ggMedianOrderValue
-
 
 # convert to plotly
 plotly::hide_legend(
@@ -318,13 +331,13 @@ Row {.tabset .tabset-fade}
 
 ```{r treemap}
 # treemap --------
-highcharter::hctreemap2(data = GroupedCanData, 
+highcharter::hctreemap2(GroupedCanData, 
                         
-              group_vars = c("brand_category"),
+              group_vars = c("product_category"),
               
-              size_var = "sales_by_cat", 
+              size_var = "units_by_prod_cat", 
               
-              color_var = "sales_by_cat",
+              color_var = "units_by_prod_cat",
               
               layoutAlgorithm = "squarified",
               
@@ -332,7 +345,7 @@ highcharter::hctreemap2(data = GroupedCanData,
               
               allowDrillToNode = TRUE) %>% 
   
-  # add the RColorBrewer greens 
+    # add the RColorBrewer greens 
   
     hc_colorAxis(minColor = RColorBrewer::brewer.pal(7, "Greens")[1],
                  
@@ -344,22 +357,22 @@ highcharter::hctreemap2(data = GroupedCanData,
 
 ```{r geom-col-top-10-brand-categories}
 # define labels ----
-top_10brand_cat_labs <- ggplot2::labs(x = " ",
+top_10product_labs <- ggplot2::labs(x = "Product Categories",
                              
-                  y = "Count (Per Month)",
+                  y = "Count",
                   
-                  title = "Top 10 Cannabis Categories") 
+                  title = "Top 10 Cannabis Products")
 
 # create session data
 cdata <- session$clientData
   
 # create BrandCatTop10React reactive ----
 
-BrandCatTop10React <- reactive({
+ProdCatTop10React <- reactive({
   
   # rename this reactive to generic data
   
-        data <- BrandCatTop10
+        data <- ProdCatTop10
         
           data
         
@@ -368,29 +381,29 @@ BrandCatTop10React <- reactive({
 # render plot with reactive -----
 plotly::renderPlotly({
   
-  data <- BrandCatTop10React()
+  data <- ProdCatTop10React()
   
     data %>% 
       
-      ggplot2::ggplot(aes(x = brand_category, 
+    ggplot2::ggplot(aes(x = product_category, 
+                        
                       y = n)) +
-      
-    ggplot2::geom_col(aes(fill = brand_category), 
+  
+    ggplot2::geom_col(aes(fill = product_category), 
+                      
                       show.legend = FALSE) +
 
     ggplot2::coord_flip() +
-      
-    ggplot2::theme_minimal(base_size = 10, 
-                               
-                          base_family = "Ubuntu") +
-      
+    
     ggplot2::scale_fill_viridis_d(direction = -1) +
     
-    top_10brand_cat_labs -> gg_top10_brand_categories
+    top_10product_labs -> gg_top10_product_categories
     
     # convert to plotly object
     plotly::hide_legend(plotly::toWebGL(
-      plotly::ggplotly(p = gg_top10_brand_categories)))
+      
+      plotly::ggplotly(p = gg_top10_product_categories)))
+    
     
 })
 ```
@@ -427,10 +440,10 @@ plotly::renderPlotly({
   
     data %>% 
       
-    ggplot2::ggplot(aes(x = brand, 
+    ggplot2::ggplot(aes(x = brand_name, 
                       y = n)) +
   
-    ggplot2::geom_col(aes(fill = brand), 
+    ggplot2::geom_col(aes(fill = brand_name), 
                       show.legend = FALSE) +
   
 
@@ -448,6 +461,7 @@ plotly::renderPlotly({
     
     # convert to plotly object
 plotly::hide_legend(plotly::toWebGL(
+  
       plotly::ggplotly(p = gg_top10_brands)))
     
 })

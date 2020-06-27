@@ -29,7 +29,9 @@ See the requirements for writing SRS documents [here](http://www.math.uaa.alaska
   2.5 Assumptions and dependencies
 
 
-## 3. Specific requirements (See 5.3.1 through 5.3.8 for explanations of possible
+## 3. Specific requirements
+
+(See 5.3.1 through 5.3.8 for explanations of possible
 specific requirements. See also Annex A for several different ways of organizing
 this section of the SRS.)
 

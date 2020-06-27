@@ -48,22 +48,22 @@ base::options(
 # set the theme here for ggplot2
 ```
 
-## Overview 
+## Welcome to the `CanDash`!
 
-File/folder structure
+This is a [`flexdashboard`](https://rmarkdown.rstudio.com/flexdashboard/) for simulated sales cannabis data. 
 
-```{r dir-tree, echo=FALSE}
-fs::dir_tree(".", recurse = FALSE)
+```{r candash-overview, echo=FALSE}
+knitr::include_graphics("figs/candash-overview.png")
 ```
 
 ## The data
 
 The data model for the `CanDash` application had to be constructed from a few different sources. First, a list of products, brands, and other categorical data were imported form the Kushy application on Github. You can find the original data for this project [here](https://github.com/kushyapp/cannabis-dataset). 
 
-We had to simulate the cost data for the products in the `Products` and `Brands` tables. We used the online retail data from the [UCI Machine Learning Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail).
+We had to simulate the cost data for the products in the `Products` and `Brands` tables. Read more about this process in the [`01.1-wrangle.md` file](). 
 
 ```{r data-objects, echo=FALSE}
-fs::dir_tree("data", recurse = TRUE)
+fs::dir_tree(".", recurse = TRUE)
 ```
 
 ## Import

@@ -1,0 +1,676 @@
+---
+title: "README - Wrangling Cannabis Data Sets"
+author: "Martin Frigaard"
+date: "current version: `r Sys.Date()`"
+output: github_document
+---
+
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+require(tidyverse)
+library(plotly)
+require(janitor)
+require(skimr)
+library(mosaic)
+library(inspectdf)
+library(visdat)
+library(DT)
+library(hrbrthemes)
+# base options ----
+base::options(
+  tibble.print_max = 25,
+  tibble.width = 78,
+  scipen = 100000000,
+  max.print = 999999
+)
+# knitr chunk options ----
+knitr::opts_chunk$set(
+  echo = FALSE, # show/hide all code
+  # results = "hide", # hide results
+  tidy = FALSE, # cleaner code printing
+  comment = "#> ", # better console printing
+  eval = TRUE, # turn this to FALSE stop code chunks from running
+  message = TRUE, # show messages
+  fig.width = 9, # figure width
+  fig.height = 6, # figure height
+  warning = FALSE, # show warnings
+  size = "small", # size of the text
+  fig.path = "figs/"
+) # location of files
+# knitr knit settings ----
+knitr::opts_knit$set(
+  width = 78
+)
+# set theme
+ggplot2::theme_set(hrbrthemes::theme_ipsum_rc(
+  base_size = 11,
+  strip_text_size = 12,
+  axis_title_size = 14,
+  plot_title_size = 21,
+  subtitle_size = 18
+))
+```
+
+# Motivation
+
+This script outlines the steps to wrangle the Cannabis data. We initially used an open online retail data set from the [UCI Machine Learning Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail) for the week-over-week visualizations (`OnlineRetail`), and combined this with categories from the [`kushyapp`](https://github.com/kushyapp/cannabis-dataset).
+
+# The data 
+
+All of the data are in the `data/` folder. 
+
+```{r data-folder, message=FALSE, warning=FALSE}
+fs::dir_tree("data/", recurse = FALSE)
+```
+
+## Import the Kushy data 
+
+These data sets provide the categories and brands from the Cannabis industry. 
+
+```{r kushy_files}
+kushy_files <- fs::dir_ls("data/kushy-datasets/csv", regexp = "kushy_")
+kushy_files
+```
+
+Import these files.
+
+```{r import-kushy-data, message=FALSE, warning=FALSE}
+KushyBrands <- readr::read_csv(kushy_files[1])
+KushyProducts <- readr::read_csv(kushy_files[2])
+KushyShops <- readr::read_csv(kushy_files[3])
+KushyStrains <- readr::read_csv(kushy_files[4])
+```
+
+## Kushy Brands
+
+These are the brands in the `KushyBrands` data frame. I want to see how many unique brands are represented here, but first I need to know what I am dealing with in terms of completeness. I can check this with `skimr`
+
+```{r KushyBrands-vis-miss}
+KushyBrands %>% 
+  visdat::vis_miss() + 
+  coord_flip()
+```
+
+
+This shows I can remove the `instagram` variable, and the `category` variable is missing `406` values. Hopefully this won't an issue. We can do without the `slug` too. 
+
+```{r remove-slug-instagram}
+KushyBrands <- KushyBrands %>% 
+  # remove the instagram and slug variables
+  dplyr::select(-c(instagram, slug)) %>% 
+  dplyr::rename(mult_category = category,
+                brand_name = name)
+KushyBrands %>% 
+  dplyr::select_if(is.character) %>% 
+  inspectdf::inspect_cat() %>% 
+  inspectdf::show_plot()
+```
+
+Now I can check the unique `name`s for each brand. These are stored in the `brand_name` variable.
+
+### The Kushy brand names
+
+These are the brand names in the `KushyBrands` data frame.
+
+```{r name-unique-length}
+KushyBrands %>% 
+  dplyr::count(brand_name, sort = TRUE) 
+```
+
+The output above shows us there are `1776` unique observations in the `name` variable, but two of them (`Brewbudz by Cannabiniers` and `Dixie Elixirs & Edibles`) appear more than once. 
+
+### Kushy brand categories 
+
+When we look at the categories we see that there are multiple categories (`mult_category`) crammed into a single column separated by commas. 
+
+```{r head-KushyBrands}
+KushyBrands %>% 
+  utils::head(10)
+```
+
+We want to separate each category out into an individual rows, because `category` *might* be useful for itemizing products later. The categories are currently separated by commas, but we can split them up and separate the rows with `tidyr::separate_rows()`. We also need to remove the whitespace from the `category` variable, and remove any rows (with other quotes). 
+
+```{r create-TidyBrandCat}
+TidyBrandCat <- KushyBrands %>% 
+  # split across rows
+  tidyr::separate_rows(data = ., mult_category, sep = ",") %>%
+  # trim the whitespace from mult_category to category
+  dplyr::mutate(category = stringr::str_trim(mult_category)) %>%
+  # remove the empty rows
+  dplyr::filter(category != "") %>% 
+  # remove the mult_category
+  dplyr::select(-mult_category,
+                brand_category = category)
+TidyBrandCat %>% dplyr::glimpse(78)
+```
+
+We've just changed the number of rows in this data frame from `1778` to `1988` because we've added a new row for each category, and these were previously on a single row (separated by a commas). If we count the number of names now, we can see there are more counts in the `n` column.
+
+```{r recount-names}
+TidyBrandCat %>% 
+  dplyr::count(brand_name, sort = TRUE) %>% 
+  utils::head(10)
+KushyBrands %>% 
+  dplyr::count(brand_name, sort = TRUE) %>% 
+  utils::head(10)
+```
+
+These are the counts for each name (products and brands), and we can see there are fewer names in the `TidyBrandCat` data frame than the `KushyBrands` data frame. 
+
+#### Verify the BaM case study
+
+Check the `BaM` case study to see if there are multiple categories for this brand. 
+
+```{r wide-BaM}
+KushyBrands %>% 
+  dplyr::filter(brand_name == "BaM")
+```
+
+And we can see there are four comma-separated categories in the `KushyBrands` data, and the same four categories are in the `TidyBrandCat`. 
+
+```{r tidy-BaM}
+TidyBrandCat %>% 
+  dplyr::filter(brand_name == "BaM")
+```
+
+This shows us there are five categories for `BaM` in `KushyBrands`, and five categories for `BaM` in `TidyBrandCat`. Now we can check the top brand categories.
+
+## Top Brand Categories
+
+When we check the top categories in the brands table, we see there are mostly `Concentrates`, `Flower`, and `Edibles`. 
+
+```{r glimpse-TidyBrands}
+TidyBrandCat %>% 
+  dplyr::count(brand_category, sort = TRUE) %>% 
+  dplyr::rename(category_count = n) %>% 
+  utils::head(10) %>% 
+  ggplot2::ggplot(aes(x = category_count, 
+                      y = forcats::fct_reorder(.f = factor(brand_category), 
+                                               .x = category_count))) + 
+  ggplot2::geom_col(aes(fill = brand_category), 
+           show.legend = FALSE) + 
+  labs(title = "Top 10 Kushy brand categories" , 
+       y = "Brand Category", x = "Count")
+```
+
+We will still want to use the `location` to replace the `country` variable in the online retail data.
+
+## Unique locations
+
+These are the unique locations in the `TidyBrandCat` dataset. 
+
+```{r count-location}
+library(magrittr)
+TidyBrandCat %$% base::unique(location)
+```
+
+We will make this a little cleaner for the graphs. 
+
+```{r format-location}
+TidyBrandCat <- TidyBrandCat %>% 
+  dplyr::mutate(location = case_when(
+    # alberta 
+    location %in% c("AB", "ab", "Ab") ~ "Alberta",
+    # manitoba
+    location %in% c("MB", "mb", "Mb") ~ "Manitoba",
+    # british columbia 
+    location %in% c("BC", "British Columbia") ~ "British Columbia",
+    # pleasant hill assuming this is Saskatchewan
+    location %in% c("Pleasant Hill") ~ "Saskatchewan",
+    # nova scotia
+    location %in% c("NS") ~ "Nova Scotia",
+    # ontario 
+    location %in% c("ON") ~ "Ontario",
+    # newfoundland
+    location %in% c("NL") ~ "Newfoundland",
+    # california 
+    location %in% c("CA", "Ca", "ca", "CALIFORNIA") ~ "California",
+    # colorado
+    location %in% c("CO", "Colorado", "Co") ~ "Colorado",
+    # washington
+    location %in% c("WA", "Washington", "Wa") ~ "Washington",
+     # arizona
+    location %in% c("AZ", "Arizona", "Az") ~ "Arizona",
+    # nevada
+    location %in% c("NV", "Nv") ~ "Nevada",
+    # michigan
+    location %in% c("MI", "Michigan") ~ "Michigan",
+    # oregon
+    location %in% c("OR", "Oregon", "Or") ~ "Oregon",
+    # Sp 
+    location %in% c("Sp", "sp") ~ "Salisbury Postcode Area (UK)",
+    # all else
+    TRUE ~ location
+  )) 
+```
+
+Here we can visualize the top brand categories by their `location`.
+
+```{r viz-top-brand-categories}
+TidyBrandCat %>% 
+  count(brand_category, sort = TRUE) %>% 
+  rename(category_count = n) %>% 
+  dplyr::inner_join(x = ., 
+                    y = TidyBrandCat, 
+                    by = "brand_category") %>% 
+  ggplot2::ggplot(aes(x = category_count, 
+                      y = forcats::fct_reorder(.f = factor(brand_category), 
+                                               .x = category_count),
+                      group = location)) + 
+  ggplot2::geom_col(aes(fill = brand_category), show.legend = FALSE) + 
+  ggplot2::facet_wrap(. ~ location, 
+             scales = "free_x") + 
+  ggplot2::labs(title = "Top Kushy brand categories by location" , 
+       y = "Brand Category", x = "Count")
+```
+
+Now we can see the vast majority of these are from `California`. We will look to join this with the product data below. We'll reduce this dataset to only the 
+
+```{r TidyBrandCat}
+TidyBrandCat <- TidyBrandCat %>% 
+  dplyr::select(-id)
+```
+
+
+***
+
+## Kushy Product Data 
+
+The kushy products are stored in the `KushyProducts` data frame. These might be a better candidate for binding to the online retail data. 
+
+```{r KushyProducts}
+KushyProducts %>% 
+  visdat::vis_miss() + 
+  coord_flip()
+```
+
+We can remove the `slug`, `strain`, `thc`, `cbd`, `lab_test`.
+
+```{r remove-missing-vars}
+KushyProducts <- KushyProducts %>% 
+  dplyr::select(-slug, 
+                -strain, 
+                -thc, 
+                -cbd,
+                -lab_test) 
+KushyProducts %>% glimpse()
+```
+
+How we can check the character variables in the data frame. 
+
+```{r KushyProducts-inspect_cat}
+KushyProducts %>% 
+  dplyr::select_if(is.character) %>% 
+  inspectdf::inspect_cat() %>% 
+  inspectdf::show_plot(text_labels = TRUE)
+```
+
+We will check the count of `name`s first. 
+
+#### Product `name`
+
+The `name` for each product is below. 
+
+```{r name-product}
+KushyProducts %>% 
+  dplyr::count(name, sort = TRUE) %>% 
+  utils::head(10)
+```
+
+### Separate product name and product details
+
+I am going to separate these terms by the hyphen ` -` and create a `product_name` variable and `product_details` variable. These two can be used to clean up the products into categories and their names.
+
+```{r create-new-product_name-and-product_details}
+KushyProducts <- KushyProducts %>% 
+  tidyr::separate(col = name, 
+                  into = c("product_name", "product_details"), 
+                  sep = " -",
+                  remove = FALSE) %>% 
+  dplyr::mutate(product_details = stringr::str_trim(product_details))
+# remove the empty variables
+KushyProducts <- KushyProducts %>% 
+  dplyr::select(id, 
+                name, 
+                product_name, 
+                product_details, 
+                brand,
+                product_category = category) 
+KushyProducts %>% 
+  dplyr::select(name,
+                dplyr::contains("product")) %>% 
+  utils::head(10)
+```
+
+We now have two variables, one for `product_name` and one for `product_category`. These each contain the same information, but arranged in different ways. 
+
+#### Products: `category`
+
+These are the categories above.
+
+```{r product-categories}
+KushyProducts %>% 
+  dplyr::count(product_category, sort = TRUE)
+```
+
+### Separate product categories across rows 
+
+We need to clean the categories just like we did in the brands data frame. 
+
+```{r clean-categories}
+TidyProdCat <- KushyProducts %>% 
+  # split across rows
+  tidyr::separate_rows(data = ., product_category, sep = ",") %>%
+  # trim the whitespace from mult_category to category
+  dplyr::mutate(category = stringr::str_trim(product_category)) %>%
+  # remove the empty rows
+  dplyr::filter(product_category != "") %>% 
+  # reorganize
+  dplyr::select(id, 
+                name,
+                product_name, 
+                product_details, 
+                product_category,
+                dplyr::everything()) 
+TidyProdCat %>% 
+  utils::head(10)
+```
+
+We can check these the same way we did with the brand categories, by selecting a case. We will use the `"Casey Jones - Crumble"` case to see if the `category` has been separated. 
+
+The original `KushyProducts` dataset:
+
+```{r casey-jones}
+KushyProducts %>% 
+  dplyr::filter(name == "Casey Jones - Crumble") %>% 
+  dplyr::select(name, product_category)
+```
+This should be translated into three rows in the `TidyProdCat` dataset. 
+
+```{r tidy-casey-jones}
+TidyProdCat %>% 
+  dplyr::filter(name == "Casey Jones - Crumble") %>% 
+  dplyr::select(name, product_category)
+```
+
+And it is!
+
+#### Products: `id`
+
+This looks like a unique `id` for each product in the data frame.
+
+```{r check-ids}
+identical(x = KushyProducts %>% dplyr::distinct(id) %>% base::nrow(),
+          y = KushyProducts %>% base::nrow())
+```
+
+So each `id` is unique, and there is one per row. We know this is not the case in the new `TidyProdCat` data frame. 
+
+#### Products: `brand`
+
+This appears similar to the `brand` variable, but it lists many more levels. 
+
+```{r total-distinct-names}
+TidyProdCat %>% dplyr::distinct(brand) %>% nrow()
+```
+
+These look similar to the brands in the `brand_name` from `TidyBrandCat`.
+
+```{r TidyBrandCat-unique-brand_names}
+TidyBrandCat %$%
+  base::unique(brand_name) %>% 
+  head(50)
+```
+
+```{r unique-brand-TidyProdCat}
+TidyProdCat %$% 
+  base::unique(brand) %>% 
+  head(50)
+```
+
+### Remove the `Unknown Producer`
+
+Let's filter out the `"Unknown Producer"`s because they will be of no use.  
+
+```{r brand-product}
+TidyProdCat <- TidyProdCat %>% 
+  dplyr::filter(brand != "Unknown Producer") 
+TidyProdCat %>% dplyr::glimpse(78)
+```
+
+This shows there are `25,862` rows in the `TidyProdCat` dataset. 
+
+```{r count-product_name}
+TidyProdCat %>% 
+  dplyr::count(product_name, sort = TRUE)
+```
+
+This shows there are some product names that occur much more than others, so we will assign these counts to the data `TidyProdCat`frame.  
+
+## Create `product_name` counts variable
+
+First I will get a data frame with only the distinct names of each product, sorted with the most common products first. 
+
+```{r TidyProdCount}
+TidyProdCount <- TidyProdCat %>%
+  # count the product (name)
+  dplyr::count(product_name, sort = TRUE) %>% 
+  # join back to the original table
+  dplyr::inner_join(x = ., 
+                    y = TidyProdCat, 
+                    by = "product_name") %>% 
+  # rename n column to count
+  dplyr::rename(product_name_count = n) %>% 
+  # remove the strain, name, thc, and id
+  dplyr::select(contains("product"),
+                brand_name = brand) %>% 
+  # arrange by brand count
+  dplyr::arrange(desc(product_name_count)) %>% 
+  # get the distinct rows 
+  dplyr::distinct(.keep_all = TRUE)
+# check the dimensions
+TidyProdCount %>% dplyr::glimpse(78)
+```
+
+We will check the number of `brands` with `base::length(base::unique())`.
+
+```{r check-brand_name}
+length(unique(TidyProdCount$brand_name))
+length(unique(TidyBrandCat$brand_name))
+```
+
+These numbers are close, so hopefully I will get a descent number when I join this to the brands. 
+
+Now I can join this to the `TidyProdCount` dataset on `brand_name`
+
+### Join products and brands
+
+This joins the brands and products on `brand_name`.
+
+```{r join-TidyProdCount-TidyBrandCat}
+TidyProdBrands <- TidyProdCount %>% 
+  dplyr::inner_join(x = ., 
+                    y = TidyBrandCat, 
+                    by = c("brand_name")) %>% 
+  dplyr::select(contains("product"),
+                contains("brand"),
+                location)
+```
+
+### Create product ranks
+
+The `product_name_count` variable is a way to rank the products, so I will use the `base::rank()` function to create a `product_rank` variable, too.
+
+```{r TidyProdBrandRank}
+TidyProdBrandRank <- TidyProdBrands %>% 
+  dplyr::distinct(product_name, product_name_count) %>% 
+  dplyr::mutate(product_rank =  base::order(product_name_count, 
+                                           na.last = TRUE, 
+                                           decreasing = TRUE)) %>% 
+  dplyr::select(product_name, product_name_count, product_rank)
+utils::head(TidyProdBrandRank)
+utils::tail(TidyProdBrandRank)
+```
+
+Now I can join this new `product_rank` back to the `TidyProdCount` dataset 
+
+```{r TidyProdRank}
+TidyProdRank <- TidyProdBrands %>% 
+  dplyr::left_join(x = ., 
+                   y = TidyProdBrandRank, 
+                   by = c("product_name", "product_name_count")) %>% 
+  # select only useful vars here
+  dplyr::select(product_name,
+                product_rank, 
+                product_category,
+                product_details,
+                brand_name,
+                location) %>% 
+  # get distint rows
+  dplyr::distinct()
+TidyProdRank %>% glimpse(78)
+```
+
+Now we have a distinct row for each product, the product ranking, the `product_category` category, and the product details.
+
+### Generate a set of random dates 
+
+We can create a `sim_datetime()` function to create a series of dates. 
+
+```{r random_datetime}
+sim_datetime <- function(n, start_time = "2019/01/01", end_time = "2020/01/01") {
+  # convert to date (as.POSIXct)
+  start_time <- base::as.POSIXct(as.Date(start_time))
+  end_time <- as.POSIXct(as.Date(end_time))
+  # get datetime difference 
+  time_diff <- base::as.numeric(base::difftime(end_time, start_time, unit = "sec"))
+  # get random (runif) intervals
+  runif_time_interval <- base::sort(stats::runif(n = n, min = 0, max = time_diff))
+  # return_time is start_time and runif_time_interval
+  return_time <- start_time + runif_time_interval
+  
+  return(return_time)
+  
+}
+```
+
+Now create these and assign to `TidyProdRank`
+
+```{r assign-invoice_dates}
+# create random dates
+invoice_dates <- sim_datetime(n = base::nrow(TidyProdRank), 
+                              start_time = "2018-01-01", 
+                              end_time = "2019-12-31")
+# assign to TidyProdRank
+TidyProdRank <- invoice_dates %>% 
+  tibble::as_tibble(x = .,) %>% 
+  dplyr::rename(invoice_date = value) %>% 
+  dplyr::bind_cols(TidyProdRank)
+# remove any before 2018
+TidyProdRank <- TidyProdRank %>% 
+  dplyr::filter(invoice_date >= lubridate::as_date("2018-01-01"))
+```
+
+### Generate random sales data for `product_name` per `product_details`
+
+Now we want a dollar amount for the items sold (`product_price`), which is a combination of `product_name` and `product_details`.
+
+```{r unique-product_name-product_details}
+length(unique(TidyProdRank$product_name))
+length(unique(TidyProdRank$product_details))
+```
+
+This will get the distinct combinations of product names and details, then generate a variable of `product_price`s, and join this back to `TidyProdRank`.
+
+```{r product_price}
+ProdPriceDetails <- TidyProdRank %>% 
+  # get names and details
+  dplyr::select(product_name, product_details) %>% 
+  # get distinct rows
+  dplyr::distinct() 
+# ProdPriceDetails %>% base::nrow()
+product_price <-  runif(n = base::nrow(ProdPriceDetails), 
+                        min = 4.99, 
+                        max = 99.99)
+ProdPrices <- product_price %>% 
+  tibble::as_tibble() %>% 
+  dplyr::rename(product_price = value) %>% 
+  dplyr::bind_cols(ProdPriceDetails)
+TidyProdRank <- TidyProdRank %>% 
+  dplyr::left_join(x = ., 
+                   y = ProdPrices, 
+                   by = c("product_name", "product_details")) %>% 
+  dplyr::mutate(product_price = base::round(product_price, digits = 2))
+```
+
+### Generate a number of `units_sold`
+
+We will create a variable of `units_sold`, one for each row in `TidyProdRank`
+
+```{r UnitsSold}
+units_sold <- runif(n = base::nrow(TidyProdRank), 
+                        min = 1L, 
+                        max = 10L)
+UnitsSold <- units_sold %>% 
+  as_tibble() %>% 
+  rename(units_sold = value) %>% 
+  dplyr::mutate(units_sold = round(units_sold, digits = 0))
+TidyProdRank <- TidyProdRank %>% 
+  bind_cols(UnitsSold)
+```
+
+Now we generate the variables for the week-over-week visualizations. 
+
+```{r wow-variables}
+KushyWowData <- TidyProdRank %>% 
+    dplyr::mutate(
+                # day of week
+                dow = lubridate::day(invoice_date), 
+                # week of the year
+                week = lubridate::week(invoice_date),
+                # year 
+                yr = lubridate::year(invoice_date), 
+                # week_year (with floor_date)
+                week_year = lubridate::floor_date(invoice_date, 
+                                                  unit = "week"),
+                # create month
+                month = lubridate::month(week_year, 
+                                         abbr = TRUE, 
+                                         label = TRUE),
+                # floor_month
+                floor_month = lubridate::floor_date(week_year, 
+                                                    unit = "month"))
+```
+
+***
+
+Export these data to processed data folder. 
+
+```{r processed-data}
+if (!file.exists("data/processed/")) {
+  dir.create("data/processed/")
+}
+# check
+fs::dir_tree("data", recurse = FALSE)
+```
+
+Time-stamp and export.
+
+```{r export}
+# export these with a time stamp
+readr::write_csv(base::as.data.frame(KushyWowData), 
+                    path = paste0("data/processed/", 
+                              base::noquote(lubridate::today()),
+                                            "-KushyWowData.csv"))
+
+readr::write_rds(x = KushyWowData, 
+                 path = paste0("data/processed/", 
+                              base::noquote(lubridate::today()),
+                                            "-KushyWowData.rds"))
+
+fs::dir_tree("data/processed/", recurse = FALSE)
+```
+
+

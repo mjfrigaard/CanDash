@@ -1,0 +1,195 @@
+---
+title: "README - Wrangling Online Retail Data Sets"
+author: "Martin Frigaard"
+date: "current version: `r Sys.Date()`"
+output: github_document
+---
+
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+require(tidyverse)
+library(plotly)
+require(janitor)
+require(skimr)
+library(mosaic)
+library(inspectdf)
+library(visdat)
+library(DT)
+library(hrbrthemes)
+# base options ----
+base::options(
+  tibble.print_max = 25,
+  tibble.width = 78,
+  scipen = 100000000,
+  max.print = 999999
+)
+# knitr chunk options ----
+knitr::opts_chunk$set(
+  echo = FALSE, # show/hide all code
+  # results = "hide", # hide results
+  tidy = FALSE, # cleaner code printing
+  comment = "#> ", # better console printing
+  eval = TRUE, # turn this to FALSE stop code chunks from running
+  message = TRUE, # show messages
+  fig.width = 9, # figure width
+  fig.height = 6, # figure height
+  warning = FALSE, # show warnings
+  size = "small", # size of the text
+  fig.path = "figs/"
+) # location of files
+# knitr knit settings ----
+knitr::opts_knit$set(
+  width = 78
+)
+# set theme
+ggplot2::theme_set(hrbrthemes::theme_ipsum_rc(
+  base_size = 11,
+  strip_text_size = 12,
+  axis_title_size = 14,
+  plot_title_size = 21,
+  subtitle_size = 18
+))
+```
+
+# Motivation
+
+This script outlines the steps to wrangle the Cannabis data. We initially used an open online retail data set from the [UCI Machine Learning Laboratory](https://archive.ics.uci.edu/ml/datasets/online+retail) for the week-over-week visualizations (`OnlineRetail`), and combined this with categories from the [`kushyapp`](https://github.com/kushyapp/cannabis-dataset).
+
+# The data 
+
+All of the data are in the `data/` folder. 
+
+```{r data-folder, message=FALSE, warning=FALSE}
+fs::dir_tree("data/", recurse = FALSE)
+```
+
+### Import the Online Retail Data
+
+The folder tree for the `data/online-retail` folder is below. 
+
+```{r data-files, message=FALSE, warning=FALSE}
+fs::dir_tree("data/online-retail", recurse = FALSE)
+```
+
+We will import these in the next code block. 
+
+```{r OnlineRetail}
+OnlineRetail <- readr::read_csv("data/online-retail/Online_Retail.csv") %>% 
+  janitor::clean_names(case = "snake")
+OnlineRetail %>% dplyr::glimpse()
+```
+
+### The retail variables
+
+`invoice_no`: Invoice number. Nominal, a 6-digit integral number uniquely assigned to each transaction. If this code starts with letter 'c', it indicates a cancellation.
+
+`stock_code`: Product (item) code. Nominal, a 5-digit integral number uniquely assigned to each distinct product.
+
+`description`: Product (item) name. Nominal.
+
+`quantity`: The quantities of each product (item) per transaction. Numeric.
+
+`invoice_date`: Invoice Date and time. Numeric, the day and time when each transaction was generated.
+
+`unit_price`: Unit price. Numeric, Product price per unit in sterling.
+
+`customer_id`: Customer number. Nominal, a 5-digit integral number uniquely assigned to each customer.
+
+`Country`: Country name. Nominal, the name of the country where each customer resides.
+
+This is huge, so we will take a 20% sample. 
+
+```{r SmOnlineRetail}
+SmOnlineRetail <- dplyr::sample_frac(tbl = OnlineRetail, size = 2/10)
+SmOnlineRetail %>% dplyr::glimpse(78)
+```
+
+This is much easier to deal with.
+
+The goal here is to simulate some cannabis data by combining the `SmOnlineRetail` data set with the kushy data sets. The best place to make the join is in the `description` or `stock_code`. First we will wrangle the variables and then we can see what the best option is to join these two data frames together. 
+
+```{r wrangle}
+SmOnlineRetail <- SmOnlineRetail %>% 
+    dplyr::mutate(
+                # create invoice date
+                invoice_date = as.Date(invoice_date, "%m/%d/%y"),
+                # day of week
+                dow = lubridate::day(invoice_date), 
+                # week of the year
+                week = lubridate::week(invoice_date),
+                # year 
+                yr = lubridate::year(invoice_date), 
+                # week_year (with floor_date)
+                week_year = lubridate::floor_date(invoice_date, 
+                                                  unit = "week"),
+                # create month
+                month = lubridate::month(week_year, 
+                                         abbr = TRUE, 
+                                         label = TRUE),
+                # floor_month
+                floor_month = lubridate::floor_date(week_year, 
+                                                    unit = "month"))
+```
+
+Now we can check and see what these data look like with `skimr::skim()`.
+
+```{r skim-SmOnlineRetail}
+SmOnlineRetail %>% skimr::skim()
+```
+
+This looks like all the wrangling worked in the way we wanted. Now lets check the counts on some of the categories. First we will check and see how many different `invoice_no`s and `stock_code`s there are:
+
+## Invoice numbers vs. Stock codes
+
+Below are the unique number of stock codes and invoice numbers. 
+
+```{r unique-invoice-no-stock-code}
+SmOnlineRetail$invoice_no %>% unique() %>% length()
+SmOnlineRetail$stock_code %>% unique() %>% length()
+```
+
+There are far more invoice numbers than stock codes, so these are a better bet for getting them to match up with the brands. 
+
+I will group these by the invoice number and get the total cost of the sale by multiplying the unit price by the number of units sold (quantity).
+
+### Create a 'amount-per-invoice' data set
+
+This will group the data by the invoice number and calculate the cost per invoice (`amnt_per_invoice`) by multiplying quantity and unit price. 
+
+```{r AmntPerInvoice}
+AmntPerInvoice <- SmOnlineRetail %>% 
+  group_by(invoice_no) %>% 
+  dplyr::mutate(amnt_per_invoice = quantity*unit_price) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::select(invoice_no, 
+                invoice_date,
+                quantity, 
+                unit_price, 
+                amnt_per_invoice,
+                dplyr::everything(),
+                -c(country))
+AmntPerInvoice %>% head(10)
+```
+
+We can check the calculations by taking a quick case (invoice `548920`). 
+
+Now I have a data set with the cost of each invoice, and I can use this join the Kushy brand data. 
+
+
+#### Derive sample of invoices, sorted by quantity
+
+Now I want to get a sample from the `AmntPerInvoice` table that is the same size of the online retail data, but first make sure these are sorted by the `quantity`. I also want to add an id that matches the id's in the `TidyProductsBrands`.
+
+Here is the kicker--I need the ids to be sorted in the *exact* same arrangement (by `prod_name_count`) because these will align with the `quantity` (i.e. most common products sync up with most sold `quantity`).
+
+```{r AmntPerInvSamp}
+AmntPerInvSamp <- AmntPerInvoice %>% 
+  dplyr::sample_n(size = 2799) %>% 
+  dplyr::arrange(desc(quantity)) %>% 
+    # remove the description and customer_id
+  dplyr::select(-description, 
+                -customer_id)
+AmntPerInvSamp %>% glimpse(78)
+```

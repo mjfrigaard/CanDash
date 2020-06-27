@@ -5,8 +5,8 @@ account: mfrigaard
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 2182072
-bundleId: 3064165
+bundleId: 3323930
 url: https://mfrigaard.shinyapps.io/candash-wow-sales/
-when: 1587837145.49122
+when: 1593291462.5117
 asMultiple: FALSE
 asStatic: FALSE
