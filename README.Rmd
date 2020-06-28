@@ -66,6 +66,38 @@ We had to simulate the cost data for the products in the `Products` and `Brands`
 
 All the visualizations were built in the [`02-visualize.md`](https://github.com/mjfrigaard/CanDash/blob/master/02-visualize.md) file using [`ggplot2`](https://ggplot2.tidyverse.org/), [`plotly`](https://github.com/ropensci/plotly#readme), and [`highcharter`](http://jkunst.com/highcharter/).
 
+### Annual Trends (Units Sold)
 
+```{r annual-trends-units-sold, echo=FALSE}
+knitr::include_graphics(path = "figs/annual-trends-units-sold.png")
+```
 
+### Quarterly Sales
 
+```{r quarterly-sales, echo=FALSE}
+knitr::include_graphics(path = "figs/quarterly-sales.png")
+```
+
+### Orders By Location
+
+```{r orders-by-location, echo=FALSE}
+knitr::include_graphics(path = "figs/orders-by-location.png")
+```
+
+### Top Daily Sales Categories
+
+```{r top-daily-sales-categories, echo=FALSE}
+knitr::include_graphics(path = "figs/top-daily-sales-categories.png")
+```
+
+### Best Selling Categories (Per Day)
+
+```{r best-selling-categories-per-day, echo=FALSE}
+knitr::include_graphics(path = "figs/best-selling-categories-per-day.png")
+```
+
+### Best Selling Brands (Per Month)
+
+```{r best-selling-brands-per-month, echo=FALSE}
+knitr::include_graphics(path = "figs/best-selling-brands-per-month.png")
+```

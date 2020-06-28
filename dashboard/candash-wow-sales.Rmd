@@ -54,7 +54,7 @@ This is a sample sales dashboard for cannabis products.
 
 These data have been simulated from the [Kushy cannabis data sets](https://github.com/kushyapp/cannabis-dataset). 
 
-Select a year below to view the sales across a 12-month period
+Select a `Year` below to view the sales across a 12-month period (*this will change the `Annual Trends (Units Sold)` and `Quarterly Sales` tabs*).
 
 ```{r select-year}
 shiny::selectInput(inputId = "yearNum", 
@@ -64,7 +64,7 @@ shiny::selectInput(inputId = "yearNum",
 ```
 
 
-Select a quarter below to view the sales across a three-month period
+Select a quarter below to view the sales across a three-month period (*this will change the `Quarterly Sales` tab*).
 
 ```{r selector-quarter}
 shiny::selectInput(inputId = "quarterNum", 
@@ -73,7 +73,8 @@ shiny::selectInput(inputId = "quarterNum",
     selected = 3)
 ```
 
-Select a region to view track the median purchase order amount by location
+
+Select a region to view track the median purchase order amount by location (*this will change the `Orders by Location` tab*).
 
 ```{r selector-location}
 shiny::selectInput(inputId = "locationNum", 
@@ -96,34 +97,34 @@ Zoom in on particular with click and drag (read more [here](https://plotly.com/c
 
 The `treemap` was built with [`highcharter`](http://jkunst.com/highcharter/).
 
-***Quantity sold per week***
+***Annual Trends (Units Sold)***
 
 This graph displays the overall quantity sold per week (with a 'best fit' line and shaded confidence interval)
 
-***Week over week sales***
+***Quarterly Sales***
 
 Percentage increase in sales by quarter and month
 
-***Median Order Amount by Location***
+***Orders by Location***
 
 Median order amount per week in each State/Region
 
-***Daily Sales by Category***
+***Top Daily Sales Categories***
 
 This [treemap](https://en.wikipedia.org/wiki/Treemapping) displays the largest selling cannabis product categories per day
 
-***Best Selling Product Categories***
+***Best Selling Categories (Per Day)***
 
 A column chart for the best performing product categories per month
 
-***Best Selling Brands***
+***Best Selling Brands (Per Month)***
 
 A column chart for the best performing brands per month
 
 Row {.tabset .tabset-fade}
 -------------------------------------
 
-### Quantity sold per week
+### Annual Trends (Units Sold)
 
 ```{r quantity-sold-per-week, eval=TRUE}
 # # set theme for wow ----
@@ -150,8 +151,8 @@ WowReact <- reactive({
 # create labs for Quantity Per Week ----
 labs_quantity_per_week <- ggplot2::labs(
          x = "Week", 
-         y = "Quantity Sold",
-         title = "Quantity Per Week") 
+         y = "Units Sold",
+         title = "Quantity Sold Per Week") 
 
 # render plot with reactive -----
 plotly::renderPlotly({
@@ -177,16 +178,14 @@ plotly::renderPlotly({
 ```
 
 
-### Week over week sales 
+### Quarterly Sales 
 
 ```{r wow-plot}
 # labels Week Over Week Annual Sales ----
 labs_wow_annual_sales <- ggplot2::labs(
   y = 'Sales', 
   x = ' ', 
-  title = 'Week Over Week Annual Sales',
-  subtitle = "Simulated Cannabis Sales Data by Quarter",
-  caption = "Graphic and analysis by PDG") 
+  title = 'Week Over Week Sales (by Quarter)') 
 
 # create reactive (QDataReact) for quarter data ----
 QDataReact <- reactive({
@@ -262,7 +261,7 @@ plotly::renderPlotly({
 })
 ```
 
-### Median Order Amount By Location 
+### Orders By Location 
 
 ```{r ggTop100MonthlyLocationSales}
 # labels
@@ -327,7 +326,7 @@ plotly::hide_legend(
 Row {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
-### Daily Sales by Category
+### Top Daily Sales Categories
 
 ```{r treemap}
 # treemap --------
@@ -353,13 +352,13 @@ highcharter::hctreemap2(GroupedCanData,
 
 ```
 
-### Best Selling Categories
+### Best Selling Categories (Per Day)
 
 ```{r geom-col-top-10-brand-categories}
 # define labels ----
-top_10product_labs <- ggplot2::labs(x = "Product Categories",
+top_10product_labs <- ggplot2::labs(x = " ",
                              
-                  y = "Count",
+                  y = "Count (Per Day)",
                   
                   title = "Top 10 Cannabis Products")
 
@@ -394,6 +393,9 @@ plotly::renderPlotly({
                       show.legend = FALSE) +
 
     ggplot2::coord_flip() +
+      
+    ggplot2::theme_minimal(base_size = 9, 
+                           base_family = "Ubuntu") +
     
     ggplot2::scale_fill_viridis_d(direction = -1) +
     
@@ -408,7 +410,7 @@ plotly::renderPlotly({
 })
 ```
 
-### Best Selling Brands
+### Best Selling Brands (Per Month)
 
 ```{r geom-col-top-10-brands}
 # define labels ----
@@ -449,8 +451,8 @@ plotly::renderPlotly({
 
     ggplot2::coord_flip() + 
       
-    ggplot2::theme_minimal(base_size = 10, 
-                               
+    ggplot2::theme_minimal(base_size = 9,
+
                                base_family = "Ubuntu") +
       
     ggplot2::scale_fill_viridis_d(direction = -1) +
