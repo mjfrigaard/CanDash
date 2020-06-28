@@ -5,7 +5,8 @@ CanDash - Cannabis Dashboards
 
 This is a
 [`flexdashboard`](https://rmarkdown.rstudio.com/flexdashboard/) for
-simulated sales cannabis data.
+simulated sales cannabis data. Check out the live version
+[here](https://mfrigaard.shinyapps.io/candash-wow-sales/).
 
 <img src="figs/candash-overview.png" width="2878" />
 

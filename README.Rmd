@@ -50,7 +50,7 @@ base::options(
 
 ## Welcome to the `CanDash`!
 
-This is a [`flexdashboard`](https://rmarkdown.rstudio.com/flexdashboard/) for simulated sales cannabis data. 
+This is a [`flexdashboard`](https://rmarkdown.rstudio.com/flexdashboard/) for simulated sales cannabis data. Check out the live version [here](https://mfrigaard.shinyapps.io/candash-wow-sales/).
 
 ```{r candash-overview, echo=FALSE}
 knitr::include_graphics("figs/candash-overview.png")
