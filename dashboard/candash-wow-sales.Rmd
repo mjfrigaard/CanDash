@@ -24,6 +24,9 @@ library(treemap)
 library(RColorBrewer)
 library(ggthemes)
 library(magrittr)
+```
+
+```{r global, include=FALSE}
 # fs::dir_ls("data/processed/", regexp = "2020-06-27")
 # import MonthlyLocationSales ------
 MonthlyLocationSales <- read_rds("data/processed/2020-06-27-MonthlyLocationSales.rds")
@@ -250,7 +253,9 @@ plotly::renderPlotly({
    
    # convert to plotly object
     plotly::hide_legend(
+      
       plotly::toWebGL(
+        
         plotly::ggplotly(p = gg_wow_sales, 
                          
                        width = cdata$output_pid_width, 

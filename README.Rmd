@@ -1,6 +1,12 @@
 ---
 title: "CanDash - Cannabis Dashboards"
-output: github_document
+output: 
+  html_document: 
+    toc: yes
+    highlight: haddock
+    theme: united
+    number_sections: yes
+    keep_md: yes
 ---
 
 ```{r setup, include=FALSE}
